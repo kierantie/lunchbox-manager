@@ -90,8 +90,8 @@ const LunchboxManager = () => {
       recess: 'bg-blue-50 border-l-blue-400 text-blue-900',
       crunchAndSip: 'bg-yellow-50 border-l-yellow-400 text-yellow-900',
       main: 'bg-green-50 border-l-green-500 text-green-900',
-      veggie: 'bg-emerald-50 border-l-emerald-400 text-emerald-900',
-      extra: 'bg-gray-50 border-l-gray-400 text-gray-900'
+      veggie: 'bg-green-50 border-l-green-400 text-green-900',
+      extra: 'bg-green-50 border-l-green-300 text-green-900'
     };
     return colors[slot] || 'bg-gray-50 border-l-gray-400 text-gray-900';
   };
@@ -739,10 +739,10 @@ const LunchboxManager = () => {
                           </div>
 
                           {todaysPlan.amelia.extras.map((item, idx) => (
-                            <div key={idx} className="bg-white p-3 rounded border-l-2 border-gray-300">
+                            <div key={idx} className="bg-white p-3 rounded border-l-2 border-green-300">
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
-                                  <div className="text-xs font-medium text-gray-700 uppercase">Extra</div>
+                                  <div className="text-xs font-medium text-green-700 uppercase">Extra</div>
                                   <div className="font-medium">{item.name}</div>
                                   <div className="flex items-center gap-2 mt-1">
                                     <StarRating rating={item.ameliaRating} label="Rating" readOnly />
@@ -755,7 +755,7 @@ const LunchboxManager = () => {
                                 </div>
                                 <button
                                   onClick={() => swapItem('amelia', 'mixed', 'extras')}
-                                  className="text-gray-600 hover:text-gray-800 text-sm flex items-center gap-1 ml-2"
+                                  className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
                                 >
                                   <Shuffle className="w-3 h-3" />
                                 </button>
@@ -885,10 +885,10 @@ const LunchboxManager = () => {
                           </div>
 
                           {todaysPlan.hazel.extras.map((item, idx) => (
-                            <div key={idx} className="bg-white p-3 rounded border-l-2 border-gray-300">
+                            <div key={idx} className="bg-white p-3 rounded border-l-2 border-green-300">
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
-                                  <div className="text-xs font-medium text-gray-700 uppercase">Extra</div>
+                                  <div className="text-xs font-medium text-green-700 uppercase">Extra</div>
                                   <div className="font-medium">{item.name}</div>
                                   <div className="flex items-center gap-2 mt-1">
                                     <StarRating rating={item.hazelRating} label="Rating" readOnly />
@@ -901,7 +901,7 @@ const LunchboxManager = () => {
                                 </div>
                                 <button
                                   onClick={() => swapItem('hazel', 'mixed', 'extras')}
-                                  className="text-gray-600 hover:text-gray-800 text-sm flex items-center gap-1 ml-2"
+                                  className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
                                 >
                                   <Shuffle className="w-3 h-3" />
                                 </button>
