@@ -12,6 +12,7 @@ const LunchboxManager = () => {
   const [availableTags, setAvailableTags] = useState(['fruity', 'savoury', 'crunchy', 'chewy', 'soft', 'treat']);
   const [newTag, setNewTag] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [confirmDeleteTag, setConfirmDeleteTag] = useState(null);
   const [newFood, setNewFood] = useState({
     name: '',
     category: 'snack', 
@@ -154,6 +155,15 @@ const LunchboxManager = () => {
         setFoods(foods.filter(f => f.id !== confirmDelete.id));
       }
       setConfirmDelete(null);
+    }
+  };
+
+  const confirmDeleteTagAction = () => {
+    if (confirmDeleteTag) {
+      setAvailableTags(availableTags.filter(t => t !== confirmDeleteTag));
+      // Remove tag from all foods
+      setFoods(foods.map(f => ({...f, tags: f.tags.filter(t => t !== confirmDeleteTag)})));
+      setConfirmDeleteTag(null);
     }
   };
 
@@ -412,6 +422,33 @@ const LunchboxManager = () => {
               </button>
               <button
                 onClick={() => setConfirmDelete(null)}
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tag Delete Confirmation Dialog */}
+      {confirmDeleteTag && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">Confirm Delete Tag</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete the tag "<span className="font-medium text-gray-900">{confirmDeleteTag}</span>"? 
+              This will remove it from all foods and cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={confirmDeleteTagAction}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+              >
+                Delete Tag
+              </button>
+              <button
+                onClick={() => setConfirmDeleteTag(null)}
                 className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
               >
                 Cancel
@@ -1076,11 +1113,7 @@ const LunchboxManager = () => {
                     <div key={tag} className="flex items-center justify-between bg-gray-100 p-2 rounded">
                       <span className="capitalize">{tag}</span>
                       <button
-                        onClick={() => {
-                          setAvailableTags(availableTags.filter(t => t !== tag));
-                          // Remove tag from all foods
-                          setFoods(foods.map(f => ({...f, tags: f.tags.filter(t => t !== tag)})));
-                        }}
+                        onClick={() => setConfirmDeleteTag(tag)}
                         className="text-red-500 hover:text-red-700 ml-2"
                         title="Delete tag"
                       >
