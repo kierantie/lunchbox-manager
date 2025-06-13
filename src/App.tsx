@@ -13,6 +13,7 @@ const LunchboxManager = () => {
   const [newTag, setNewTag] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [confirmDeleteTag, setConfirmDeleteTag] = useState(null);
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const [newFood, setNewFood] = useState({
     name: '',
     category: 'snack', 
@@ -68,7 +69,21 @@ const LunchboxManager = () => {
   };
 
   const formatDateWithDay = (dateString) => {
-    const date = new Date(dateString);
+    // Handle different date formats that might come from toLocaleDateString()
+    let date;
+    if (dateString.includes('/')) {
+      // Handle MM/DD/YYYY format
+      date = new Date(dateString);
+    } else {
+      // Handle other formats or fallback
+      date = new Date(dateString);
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return dateString; // Return original string if invalid
+    }
+    
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
@@ -619,7 +634,7 @@ const LunchboxManager = () => {
                     <h3 className="text-lg font-medium text-gray-700">Plan for {todaysPlan.date}</h3>
                   </div>
                   
-                  <div className="grid lg:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold text-purple-600 border-b-2 border-purple-200 pb-2">
                         Amelia's Lunchbox
@@ -950,7 +965,7 @@ const LunchboxManager = () => {
               <h2 className="text-xl font-semibold mb-6">Lunch History</h2>
               {lunchHistory.length > 0 ? (
                 <div className="space-y-4">
-                  {lunchHistory.slice(-14).reverse().map((day, idx) => (
+                  {lunchHistory.slice(showAllHistory ? -lunchHistory.length : -10).reverse().map((day, idx) => (
                     <div key={idx} className="bg-white border-2 border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow">
                       {/* Date Header */}
                       <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3 rounded-t-xl border-b border-gray-200">
@@ -1005,6 +1020,32 @@ const LunchboxManager = () => {
                       </div>
                     </div>
                   ))}
+                  
+                  {/* Show More/Less Button */}
+                  {lunchHistory.length > 10 && (
+                    <div className="text-center mt-6">
+                      <button
+                        onClick={() => setShowAllHistory(!showAllHistory)}
+                        className="bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 px-6 py-3 rounded-lg hover:from-indigo-200 hover:to-purple-200 flex items-center gap-2 mx-auto font-medium border-2 border-indigo-200 transition-all duration-200"
+                      >
+                        {showAllHistory ? (
+                          <>
+                            Show Less
+                            <div className="text-xs bg-indigo-200 px-2 py-1 rounded-full">
+                              Hide {lunchHistory.length - 10} older
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            Show More
+                            <div className="text-xs bg-indigo-200 px-2 py-1 rounded-full">
+                              +{lunchHistory.length - 10} more
+                            </div>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-300">
@@ -1019,6 +1060,63 @@ const LunchboxManager = () => {
           {activeTab === 'foods' && (
             <div>
               <h2 className="text-xl font-semibold mb-6">Manage Food Options</h2>
+              
+              {/* Shopping List Summary */}
+              {(foods.filter(f => isRunningLow(f)).length > 0 || archivedFoods.length > 0) && (
+                <div className="bg-gradient-to-r from-orange-50 to-red-50 border-2 border-orange-200 rounded-xl p-6 mb-6">
+                  <h3 className="text-lg font-bold text-orange-800 mb-4 flex items-center gap-2">
+                    🛒 Shopping List Summary
+                  </h3>
+                  
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {/* Low Stock Items */}
+                    {foods.filter(f => isRunningLow(f)).length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-red-700 mb-2 flex items-center gap-1">
+                          <AlertTriangle className="w-4 h-4" />
+                          Running Low ({foods.filter(f => isRunningLow(f)).length} items)
+                        </h4>
+                        <ul className="space-y-1">
+                          {foods.filter(f => isRunningLow(f)).map(food => (
+                            <li key={food.id} className="text-sm text-red-600 flex justify-between">
+                              <span>• {food.name}</span>
+                              <span className="font-medium">{food.servings} left</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {/* Out of Stock Items */}
+                    {archivedFoods.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                          <Archive className="w-4 h-4" />
+                          Out of Stock ({archivedFoods.length} items)
+                        </h4>
+                        <ul className="space-y-1">
+                          {archivedFoods.slice(0, 5).map(food => (
+                            <li key={food.id} className="text-sm text-gray-600">
+                              • {food.name}
+                            </li>
+                          ))}
+                          {archivedFoods.length > 5 && (
+                            <li className="text-sm text-gray-500 italic">
+                              + {archivedFoods.length - 5} more items
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="mt-4 pt-4 border-t border-orange-200">
+                    <p className="text-sm text-orange-700">
+                      💡 Copy these items to your shopping app before heading to the store!
+                    </p>
+                  </div>
+                </div>
+              )}
               
               <div className="bg-gray-50 p-4 rounded-lg mb-6">
                 <h3 className="font-medium mb-4">Add New Food</h3>
@@ -1125,28 +1223,40 @@ const LunchboxManager = () => {
 
               <div className="space-y-6">
                 {['snack', 'fruit', 'main', 'veggie'].map(category => (
-                  <div key={category} className="border rounded-lg p-4">
-                    <h3 className="font-medium mb-3 capitalize">
-                      {category === 'snack' ? 'Snacks & Sides' : category} Options
+                  <div key={category} className="border-2 border-gray-200 rounded-xl p-6 bg-gradient-to-r from-gray-50 to-white">
+                    <h3 className="text-xl font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200 capitalize">
+                      {category === 'snack' ? '🍿 Snacks & Sides' : 
+                       category === 'fruit' ? '🍎 Fruits' :
+                       category === 'main' ? '🍽️ Main Dishes' : '🥕 Vegetables'} Options
                     </h3>
                     <div className="grid gap-3">
                       {foods.filter(f => f.category === category).map(food => (
                         <div key={food.id} className="bg-gray-50 p-3 rounded-lg">
                           <div className="flex justify-between items-start mb-2">
-                            <h4 className="font-medium flex items-center gap-2">
-                              {food.name}
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-semibold text-lg text-gray-800">{food.name}</h4>
+                                {food.servings !== null && food.servings !== undefined && (
+                                  <div className="text-right">
+                                    <div className="text-sm font-medium text-gray-600">Stock:</div>
+                                    <div className={`text-lg font-bold ${
+                                      isRunningLow(food) ? 'text-red-600' : 
+                                      food.servings === 0 ? 'text-gray-400' : 'text-green-600'
+                                    }`}>
+                                      {food.servings} left
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                               {isRunningLow(food) && (
-                                <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 flex items-center gap-1">
-                                  <AlertTriangle className="w-3 h-3" />
-                                  Low stock
-                                </span>
+                                <div className="mt-2">
+                                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm bg-red-100 text-red-800 font-medium">
+                                    <AlertTriangle className="w-4 h-4" />
+                                    Running Low - Add to Shopping List
+                                  </span>
+                                </div>
                               )}
-                              {food.servings !== null && food.servings !== undefined && (
-                                <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                                  {food.servings} servings
-                                </span>
-                              )}
-                            </h4>
+                            </div>
                             <div className="flex gap-2">
                               <button
                                 onClick={() => setEditingFood(food)}
