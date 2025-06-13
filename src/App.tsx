@@ -33,7 +33,13 @@ const LunchboxManager = () => {
     autoArchiveThreshold: 60, // Days without use before suggesting archive
     defaultServings: 1,       // Default servings when adding new food
     showUsageInPlanning: true,// Show usage frequency in planning view
-    compactMode: false        // Use compact display mode
+    compactMode: false,       // Use compact display mode
+    defaultSlots: {
+      main: 1,                // Default main items per lunch
+      recess: 2,              // Default recess items per lunch  
+      extras: 2,              // Default extra items per lunch
+      crunchSip: 1            // Default crunch & sip items per lunch
+    }
   });
   const [newFood, setNewFood] = useState({
     name: '',
@@ -278,7 +284,13 @@ const LunchboxManager = () => {
           autoArchiveThreshold: 60,
           defaultServings: 1,
           showUsageInPlanning: true,
-          compactMode: false
+          compactMode: false,
+          defaultSlots: {
+            main: 1,
+            recess: 2,
+            extras: 2,
+            crunchSip: 1
+          }
         });
         
         // Import filters if present
@@ -514,11 +526,17 @@ const LunchboxManager = () => {
     return selected;
   };
 
-  // Helper function to calculate dynamic quantities based on main dish rating
+  // Helper function to calculate dynamic quantities based on main dish rating and settings
   const getDynamicQuantities = (mainRating) => {
+    // Use default slot counts from settings, but adjust based on main rating
+    const baseRecess = appSettings.defaultSlots.recess;
+    const baseExtras = appSettings.defaultSlots.extras;
+    
     return {
-      recessCount: mainRating >= 4 ? 2 : 3,
-      extrasCount: mainRating >= 4 ? 2 : 3
+      mainCount: appSettings.defaultSlots.main,
+      recessCount: mainRating >= 4 ? Math.max(1, baseRecess - 1) : baseRecess,
+      extrasCount: mainRating >= 4 ? Math.max(1, baseExtras - 1) : baseExtras,
+      crunchSipCount: appSettings.defaultSlots.crunchSip
     };
   };
 
@@ -704,17 +722,18 @@ const LunchboxManager = () => {
       const selectedMain = selectRandomPreferredItems(mains, 1, child)[0];
       const mainRating = selectedMain ? (child === 'amelia' ? selectedMain.ameliaRating : selectedMain.hazelRating) : 3;
       
-      const { recessCount, extrasCount } = getDynamicQuantities(mainRating);
+      const { mainCount, recessCount, extrasCount, crunchSipCount } = getDynamicQuantities(mainRating);
       
       const recessFoods = [...snacks, ...fruits]; // Recess can have snacks and fruits
       const lunchExtrasFoods = [...snacks, ...fruits]; // Lunch extras can include fruits for variety
+      const crunchSipFoods = [...fruits, ...veggies]; // Crunch & Sip can be fruits or veggies
       const usedTags = selectedMain ? [...selectedMain.tags] : [];
       
       const recessItems = selectRandomPreferredItems(recessFoods, recessCount, child, [...usedTags]);
       recessItems.forEach(item => usedTags.push(...item.tags));
       
-      const crunchAndSipItem = selectRandomPreferredItems(fruits, 1, child, [...usedTags])[0];
-      if (crunchAndSipItem) usedTags.push(...crunchAndSipItem.tags);
+      const crunchSipItems = selectRandomPreferredItems(crunchSipFoods, crunchSipCount, child, [...usedTags]);
+      crunchSipItems.forEach(item => usedTags.push(...item.tags));
       
       const veggieItem = selectRandomPreferredItems(veggies, 1, child, [...usedTags])[0];
       if (veggieItem) usedTags.push(...veggieItem.tags);
@@ -731,9 +750,9 @@ const LunchboxManager = () => {
       
       return {
         recess: recessItems,
-        crunchAndSip: crunchAndSipItem || fruits[0] || null,
-        main: selectedMain || mains[0] || null,
-        veggie: veggieItem || veggies[0] || null,
+        crunchSip: crunchSipItems,
+        main: selectedMain ? [selectedMain] : [],
+        veggie: veggieItem ? [veggieItem] : [],
         extras: extrasItems
       };
     };
@@ -786,18 +805,19 @@ const LunchboxManager = () => {
       const mainRating = selectedMain ? (child === 'amelia' ? selectedMain.ameliaRating : selectedMain.hazelRating) : 3;
       
       // Determine quantities based on main rating
-      const { recessCount, extrasCount } = getDynamicQuantities(mainRating);
+      const { mainCount, recessCount, extrasCount, crunchSipCount } = getDynamicQuantities(mainRating);
       
       const recessFoods = [...snacks, ...fruits]; // Recess can have snacks and fruits
       const lunchExtrasFoods = [...snacks, ...fruits]; // Lunch extras can include fruits for variety
+      const crunchSipFoods = [...fruits, ...veggies]; // Crunch & Sip can be fruits or veggies
       const usedTags = selectedMain ? [...selectedMain.tags] : [];
       
       // Select items using history-aware selection
       const recessItems = selectPreferredItemsWithHistory(recessFoods, recessCount, child, [...usedTags]);
       recessItems.forEach(item => usedTags.push(...item.tags));
       
-      const crunchAndSipItem = selectPreferredItemsWithHistory(fruits, 1, child, [...usedTags])[0];
-      if (crunchAndSipItem) usedTags.push(...crunchAndSipItem.tags);
+      const crunchSipItems = selectPreferredItemsWithHistory(crunchSipFoods, crunchSipCount, child, [...usedTags]);
+      crunchSipItems.forEach(item => usedTags.push(...item.tags));
       
       const veggieItem = selectPreferredItemsWithHistory(veggies, 1, child, [...usedTags])[0];
       if (veggieItem) usedTags.push(...veggieItem.tags);
@@ -815,9 +835,9 @@ const LunchboxManager = () => {
       
       return {
         recess: recessItems,
-        crunchAndSip: crunchAndSipItem || fruits[0] || null,
-        main: selectedMain || mains[0] || null,
-        veggie: veggieItem || veggies[0] || null,
+        crunchSip: crunchSipItems,
+        main: selectedMain ? [selectedMain] : [],
+        veggie: veggieItem ? [veggieItem] : [],
         extras: extrasItems
       };
     };
@@ -830,6 +850,86 @@ const LunchboxManager = () => {
 
     setTodaysPlan(plan);
     showMotivationalMessage('plan_generated');
+  };
+
+  // Add a new slot to a specific section of a child's plan
+  const addSlot = (child, section) => {
+    if (!todaysPlan) return;
+    
+    const childPlan = todaysPlan[child];
+    const snacks = getChildFoods('snack', child);
+    const fruits = getChildFoods('fruit', child);
+    const mains = getChildFoods('main', child);
+    const veggies = getChildFoods('veggie', child);
+    
+    // Get foods already used in this child's plan to avoid duplicates
+    const usedFoodIds = new Set();
+    ['main', 'recess', 'extras', 'crunchSip'].forEach(sec => {
+      if (childPlan[sec]) {
+        childPlan[sec].forEach(item => usedFoodIds.add(item.id));
+      }
+    });
+    
+    let newItem = null;
+    let availableFoods = [];
+    
+    // Determine what type of food to add based on section
+    switch (section) {
+      case 'main':
+        availableFoods = mains.filter(f => !usedFoodIds.has(f.id));
+        break;
+      case 'recess':
+        availableFoods = [...snacks, ...fruits].filter(f => !usedFoodIds.has(f.id));
+        break;
+      case 'extras':
+        availableFoods = [...snacks, ...fruits].filter(f => !usedFoodIds.has(f.id));
+        break;
+      case 'crunchSip':
+        availableFoods = [...fruits, ...veggies].filter(f => !usedFoodIds.has(f.id));
+        break;
+    }
+    
+    // Select a new item using the same logic as plan generation
+    if (availableFoods.length > 0) {
+      const recentlyUsedFoods = getRecentlyUsedFoods(child, 2);
+      const availableNonRecent = availableFoods.filter(f => !recentlyUsedFoods.has(f.id));
+      const foodsToChooseFrom = availableNonRecent.length > 0 ? availableNonRecent : availableFoods;
+      
+      newItem = selectPreferredItemsWithHistory(foodsToChooseFrom, 1, child)[0];
+    }
+    
+    if (newItem) {
+      const updatedPlan = {
+        ...todaysPlan,
+        [child]: {
+          ...childPlan,
+          [section]: [...(childPlan[section] || []), newItem]
+        }
+      };
+      setTodaysPlan(updatedPlan);
+      showMotivationalMessage('slot_added');
+    }
+  };
+
+  // Remove a slot from a specific section of a child's plan
+  const removeSlot = (child, section, index) => {
+    if (!todaysPlan) return;
+    
+    const childPlan = todaysPlan[child];
+    const sectionItems = [...(childPlan[section] || [])];
+    
+    // Remove the item at the specified index
+    sectionItems.splice(index, 1);
+    
+    const updatedPlan = {
+      ...todaysPlan,
+      [child]: {
+        ...childPlan,
+        [section]: sectionItems
+      }
+    };
+    
+    setTodaysPlan(updatedPlan);
   };
 
   const addFood = () => {
@@ -1052,16 +1152,16 @@ const LunchboxManager = () => {
         date: todaysPlan.date,
         amelia: [
           ...todaysPlan.amelia.recess.map(item => ({...item, slot: 'recess'})),
-          {...todaysPlan.amelia.crunchAndSip, slot: 'crunchAndSip'},
-          {...todaysPlan.amelia.main, slot: 'main'},
-          {...todaysPlan.amelia.veggie, slot: 'veggie'},
+          ...todaysPlan.amelia.crunchSip.map(item => ({...item, slot: 'crunchSip'})),
+          ...todaysPlan.amelia.main.map(item => ({...item, slot: 'main'})),
+          ...todaysPlan.amelia.veggie.map(item => ({...item, slot: 'veggie'})),
           ...todaysPlan.amelia.extras.map(item => ({...item, slot: 'extra'}))
         ],
         hazel: [
           ...todaysPlan.hazel.recess.map(item => ({...item, slot: 'recess'})),
-          {...todaysPlan.hazel.crunchAndSip, slot: 'crunchAndSip'},
-          {...todaysPlan.hazel.main, slot: 'main'},
-          {...todaysPlan.hazel.veggie, slot: 'veggie'},
+          ...todaysPlan.hazel.crunchSip.map(item => ({...item, slot: 'crunchSip'})),
+          ...todaysPlan.hazel.main.map(item => ({...item, slot: 'main'})),
+          ...todaysPlan.hazel.veggie.map(item => ({...item, slot: 'veggie'})),
           ...todaysPlan.hazel.extras.map(item => ({...item, slot: 'extra'}))
         ]
       };
@@ -1527,6 +1627,24 @@ const LunchboxManager = () => {
                           <span className="text-xs bg-blue-100 px-2 py-1 rounded-full">
                             {todaysPlan.amelia.recess.length} items
                           </span>
+                          <div className="flex items-center gap-1 ml-auto">
+                            <button
+                              onClick={() => addSlot('amelia', 'recess')}
+                              className="w-6 h-6 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
+                              title="Add recess item"
+                            >
+                              +
+                            </button>
+                            {todaysPlan.amelia.recess.length > 1 && (
+                              <button
+                                onClick={() => removeSlot('amelia', 'recess', todaysPlan.amelia.recess.length - 1)}
+                                className="w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
+                                title="Remove last recess item"
+                              >
+                                −
+                              </button>
+                            )}
+                          </div>
                         </h4>
                         <div className="space-y-2">
                           {todaysPlan.amelia.recess.map((item, idx) => (
@@ -1562,12 +1680,24 @@ const LunchboxManager = () => {
                                   </div>
                                   <TagBadges tags={item.tags} />
                                 </div>
-                                <button
-                                  onClick={() => swapSingleItem('amelia', 'recess', idx)}
-                                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1 ml-2"
-                                >
-                                  <Shuffle className="w-3 h-3" />
-                                </button>
+                                <div className="flex items-center gap-1 ml-2">
+                                  <button
+                                    onClick={() => swapSingleItem('amelia', 'recess', idx)}
+                                    className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                                    title="Shuffle this item"
+                                  >
+                                    <Shuffle className="w-3 h-3" />
+                                  </button>
+                                  {todaysPlan.amelia.recess.length > 1 && (
+                                    <button
+                                      onClick={() => removeSlot('amelia', 'recess', idx)}
+                                      className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
+                                      title="Remove this item"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -1575,27 +1705,85 @@ const LunchboxManager = () => {
                       </div>
 
                       <div className="bg-yellow-50 p-4 rounded-lg">
-                        <h4 className="font-semibold text-yellow-900 mb-3">Crunch & Sip</h4>
-                        <div className="bg-white p-3 rounded border-l-2 border-yellow-400">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="font-medium">{todaysPlan.amelia.crunchAndSip.name}</div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <StarRating rating={todaysPlan.amelia.crunchAndSip.ameliaRating} label="Rating" readOnly />
-                              </div>
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                <PrepBadge prep={todaysPlan.amelia.crunchAndSip.prep} />
-                                <HealthBadge rating={todaysPlan.amelia.crunchAndSip.healthRating} />
-                              </div>
-                              <TagBadges tags={todaysPlan.amelia.crunchAndSip.tags} />
-                            </div>
+                        <h4 className="font-semibold text-yellow-900 mb-3 flex items-center gap-2">
+                          Crunch & Sip
+                          <span className="text-xs bg-yellow-100 px-2 py-1 rounded-full">
+                            {todaysPlan.amelia.crunchSip.length} items
+                          </span>
+                          <div className="flex items-center gap-1 ml-auto">
                             <button
-                              onClick={() => swapSingleItem('amelia', 'crunchAndSip')}
-                              className="text-yellow-600 hover:text-yellow-800 text-sm flex items-center gap-1 ml-2"
+                              onClick={() => addSlot('amelia', 'crunchSip')}
+                              className="w-6 h-6 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
+                              title="Add crunch & sip item"
                             >
-                              <Shuffle className="w-3 h-3" />
+                              +
                             </button>
+                            {todaysPlan.amelia.crunchSip.length > 1 && (
+                              <button
+                                onClick={() => removeSlot('amelia', 'crunchSip', todaysPlan.amelia.crunchSip.length - 1)}
+                                className="w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
+                                title="Remove last crunch & sip item"
+                              >
+                                −
+                              </button>
+                            )}
                           </div>
+                        </h4>
+                        <div className="space-y-2">
+                          {todaysPlan.amelia.crunchSip.map((item, idx) => (
+                            <div key={idx} className="bg-white p-3 rounded border-l-2 border-yellow-400">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <div className="font-medium">{item.name}</div>
+                                    {(() => {
+                                      const usageCount = getFoodUsageFrequency(item.id);
+                                      if (usageCount > 0) {
+                                        return (
+                                          <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                                            {usageCount}x
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <StarRating rating={item.ameliaRating} label="Rating" readOnly />
+                                  </div>
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    <PrepBadge prep={item.prep} />
+                                    <HealthBadge rating={item.healthRating} />
+                                    {isRunningLow(item) && (
+                                      <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3" />
+                                        Low stock
+                                      </span>
+                                    )}
+                                  </div>
+                                  <TagBadges tags={item.tags} />
+                                </div>
+                                <div className="flex items-center gap-1 ml-2">
+                                  <button
+                                    onClick={() => swapSingleItem('amelia', 'crunchSip', idx)}
+                                    className="text-yellow-600 hover:text-yellow-800 text-sm flex items-center gap-1"
+                                    title="Shuffle this item"
+                                  >
+                                    <Shuffle className="w-3 h-3" />
+                                  </button>
+                                  {todaysPlan.amelia.crunchSip.length > 1 && (
+                                    <button
+                                      onClick={() => removeSlot('amelia', 'crunchSip', idx)}
+                                      className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
+                                      title="Remove this item"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
 
@@ -1606,75 +1794,208 @@ const LunchboxManager = () => {
                           <span className="text-xs bg-green-100 px-2 py-1 rounded-full">
                             {todaysPlan.amelia.extras.length} extras
                           </span>
+                          <div className="flex items-center gap-1 ml-auto">
+                            <button
+                              onClick={() => addSlot('amelia', 'extras')}
+                              className="w-6 h-6 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
+                              title="Add extra item"
+                            >
+                              +
+                            </button>
+                            {todaysPlan.amelia.extras.length > 1 && (
+                              <button
+                                onClick={() => removeSlot('amelia', 'extras', todaysPlan.amelia.extras.length - 1)}
+                                className="w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
+                                title="Remove last extra item"
+                              >
+                                −
+                              </button>
+                            )}
+                          </div>
                         </h4>
                         <div className="space-y-2">
-                          <div className="bg-white p-3 rounded border-l-4 border-green-500">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="text-xs font-medium text-green-700 uppercase">Main</div>
-                                <div className="font-medium">{todaysPlan.amelia.main.name}</div>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <StarRating rating={todaysPlan.amelia.main.ameliaRating} label="Rating" readOnly />
-                                </div>
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                  <PrepBadge prep={todaysPlan.amelia.main.prep} />
-                                  <HealthBadge rating={todaysPlan.amelia.main.healthRating} />
-                                </div>
-                                <TagBadges tags={todaysPlan.amelia.main.tags} />
-                              </div>
-                              <button
-                                onClick={() => swapSingleItem('amelia', 'main')}
-                                className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
-                              >
-                                <Shuffle className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                          
-                          <div className="bg-white p-3 rounded border-l-2 border-green-300">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="text-xs font-medium text-green-700 uppercase">Veggie</div>
-                                <div className="font-medium">{todaysPlan.amelia.veggie.name}</div>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <StarRating rating={todaysPlan.amelia.veggie.ameliaRating} label="Rating" readOnly />
-                                </div>
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                  <PrepBadge prep={todaysPlan.amelia.veggie.prep} />
-                                  <HealthBadge rating={todaysPlan.amelia.veggie.healthRating} />
-                                </div>
-                                <TagBadges tags={todaysPlan.amelia.veggie.tags} />
-                              </div>
-                              <button
-                                onClick={() => swapSingleItem('amelia', 'veggie')}
-                                className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
-                              >
-                                <Shuffle className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {todaysPlan.amelia.extras.map((item, idx) => (
-                            <div key={idx} className="bg-white p-3 rounded border-l-2 border-green-300">
+                          {todaysPlan.amelia.main.map((item, idx) => (
+                            <div key={idx} className="bg-white p-3 rounded border-l-4 border-green-500">
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
-                                  <div className="text-xs font-medium text-green-700 uppercase">Extra</div>
-                                  <div className="font-medium">{item.name}</div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="text-xs font-medium text-green-700 uppercase">Main</div>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        onClick={() => addSlot('amelia', 'main')}
+                                        className="w-4 h-4 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
+                                        title="Add main item"
+                                      >
+                                        +
+                                      </button>
+                                      {todaysPlan.amelia.main.length > 1 && (
+                                        <button
+                                          onClick={() => removeSlot('amelia', 'main', idx)}
+                                          className="w-4 h-4 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
+                                          title="Remove this main item"
+                                        >
+                                          −
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="font-medium">{item.name}</div>
+                                    {(() => {
+                                      const usageCount = getFoodUsageFrequency(item.id);
+                                      if (usageCount > 0) {
+                                        return (
+                                          <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                                            {usageCount}x
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
                                   <div className="flex items-center gap-2 mt-1">
                                     <StarRating rating={item.ameliaRating} label="Rating" readOnly />
                                   </div>
                                   <div className="flex flex-wrap gap-1 mt-2">
                                     <PrepBadge prep={item.prep} />
                                     <HealthBadge rating={item.healthRating} />
+                                    {isRunningLow(item) && (
+                                      <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3" />
+                                        Low stock
+                                      </span>
+                                    )}
                                   </div>
                                   <TagBadges tags={item.tags} />
                                 </div>
                                 <button
-                                  onClick={() => swapSingleItem('amelia', 'extras', idx)}
+                                  onClick={() => swapSingleItem('amelia', 'main', idx)}
                                   className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
+                                  title="Shuffle this item"
                                 >
                                   <Shuffle className="w-3 h-3" />
                                 </button>
+                              </div>
+                            </div>
+                          ))}
+                          
+                          {todaysPlan.amelia.veggie.map((item, idx) => (
+                            <div key={idx} className="bg-white p-3 rounded border-l-2 border-green-300">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <div className="text-xs font-medium text-green-700 uppercase">Veggie</div>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        onClick={() => addSlot('amelia', 'veggie')}
+                                        className="w-4 h-4 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
+                                        title="Add veggie item"
+                                      >
+                                        +
+                                      </button>
+                                      {todaysPlan.amelia.veggie.length > 1 && (
+                                        <button
+                                          onClick={() => removeSlot('amelia', 'veggie', idx)}
+                                          className="w-4 h-4 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
+                                          title="Remove this veggie item"
+                                        >
+                                          −
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="font-medium">{item.name}</div>
+                                    {(() => {
+                                      const usageCount = getFoodUsageFrequency(item.id);
+                                      if (usageCount > 0) {
+                                        return (
+                                          <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                                            {usageCount}x
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <StarRating rating={item.ameliaRating} label="Rating" readOnly />
+                                  </div>
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    <PrepBadge prep={item.prep} />
+                                    <HealthBadge rating={item.healthRating} />
+                                    {isRunningLow(item) && (
+                                      <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3" />
+                                        Low stock
+                                      </span>
+                                    )}
+                                  </div>
+                                  <TagBadges tags={item.tags} />
+                                </div>
+                                <button
+                                  onClick={() => swapSingleItem('amelia', 'veggie', idx)}
+                                  className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
+                                  title="Shuffle this item"
+                                >
+                                  <Shuffle className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+
+                          {todaysPlan.amelia.extras.map((item, idx) => (
+                            <div key={idx} className="bg-white p-3 rounded border-l-2 border-green-300">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="text-xs font-medium text-green-700 uppercase">Extra</div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="font-medium">{item.name}</div>
+                                    {(() => {
+                                      const usageCount = getFoodUsageFrequency(item.id);
+                                      if (usageCount > 0) {
+                                        return (
+                                          <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                                            {usageCount}x
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <StarRating rating={item.ameliaRating} label="Rating" readOnly />
+                                  </div>
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    <PrepBadge prep={item.prep} />
+                                    <HealthBadge rating={item.healthRating} />
+                                    {isRunningLow(item) && (
+                                      <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3" />
+                                        Low stock
+                                      </span>
+                                    )}
+                                  </div>
+                                  <TagBadges tags={item.tags} />
+                                </div>
+                                <div className="flex items-center gap-1 ml-2">
+                                  <button
+                                    onClick={() => swapSingleItem('amelia', 'extras', idx)}
+                                    className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1"
+                                    title="Shuffle this item"
+                                  >
+                                    <Shuffle className="w-3 h-3" />
+                                  </button>
+                                  {todaysPlan.amelia.extras.length > 1 && (
+                                    <button
+                                      onClick={() => removeSlot('amelia', 'extras', idx)}
+                                      className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
+                                      title="Remove this item"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -1703,13 +2024,232 @@ const LunchboxManager = () => {
                           <span className="text-xs bg-blue-100 px-2 py-1 rounded-full">
                             {todaysPlan.hazel.recess.length} items
                           </span>
+                          <div className="flex items-center gap-1 ml-auto">
+                            <button
+                              onClick={() => addSlot('hazel', 'recess')}
+                              className="w-6 h-6 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
+                              title="Add recess item"
+                            >
+                              +
+                            </button>
+                            {todaysPlan.hazel.recess.length > 1 && (
+                              <button
+                                onClick={() => removeSlot('hazel', 'recess', todaysPlan.hazel.recess.length - 1)}
+                                className="w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
+                                title="Remove last recess item"
+                              >
+                                −
+                              </button>
+                            )}
+                          </div>
                         </h4>
                         <div className="space-y-2">
                           {todaysPlan.hazel.recess.map((item, idx) => (
                             <div key={idx} className="bg-white p-3 rounded border-l-2 border-blue-400">
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
-                                  <div className="font-medium">{item.name}</div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="font-medium">{item.name}</div>
+                                    {(() => {
+                                      const usageCount = getFoodUsageFrequency(item.id);
+                                      if (usageCount > 0) {
+                                        return (
+                                          <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                                            {usageCount}x
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <StarRating rating={item.hazelRating} label="Rating" readOnly />
+                                  </div>
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    <PrepBadge prep={item.prep} />
+                                    <HealthBadge rating={item.healthRating} />
+                                    {isRunningLow(item) && (
+                                      <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3" />
+                                        Low stock
+                                      </span>
+                                    )}
+                                  </div>
+                                  <TagBadges tags={item.tags} />
+                                </div>
+                                <div className="flex items-center gap-1 ml-2">
+                                  <button
+                                    onClick={() => swapSingleItem('hazel', 'recess', idx)}
+                                    className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                                    title="Shuffle this item"
+                                  >
+                                    <Shuffle className="w-3 h-3" />
+                                  </button>
+                                  {todaysPlan.hazel.recess.length > 1 && (
+                                    <button
+                                      onClick={() => removeSlot('hazel', 'recess', idx)}
+                                      className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
+                                      title="Remove this item"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-yellow-50 p-4 rounded-lg">
+                        <h4 className="font-semibold text-yellow-900 mb-3 flex items-center gap-2">
+                          Crunch & Sip
+                          <span className="text-xs bg-yellow-100 px-2 py-1 rounded-full">
+                            {todaysPlan.hazel.crunchSip.length} items
+                          </span>
+                          <div className="flex items-center gap-1 ml-auto">
+                            <button
+                              onClick={() => addSlot('hazel', 'crunchSip')}
+                              className="w-6 h-6 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
+                              title="Add crunch & sip item"
+                            >
+                              +
+                            </button>
+                            {todaysPlan.hazel.crunchSip.length > 1 && (
+                              <button
+                                onClick={() => removeSlot('hazel', 'crunchSip', todaysPlan.hazel.crunchSip.length - 1)}
+                                className="w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
+                                title="Remove last crunch & sip item"
+                              >
+                                −
+                              </button>
+                            )}
+                          </div>
+                        </h4>
+                        <div className="space-y-2">
+                          {todaysPlan.hazel.crunchSip.map((item, idx) => (
+                            <div key={idx} className="bg-white p-3 rounded border-l-2 border-yellow-400">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <div className="font-medium">{item.name}</div>
+                                    {(() => {
+                                      const usageCount = getFoodUsageFrequency(item.id);
+                                      if (usageCount > 0) {
+                                        return (
+                                          <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                                            {usageCount}x
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <StarRating rating={item.hazelRating} label="Rating" readOnly />
+                                  </div>
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    <PrepBadge prep={item.prep} />
+                                    <HealthBadge rating={item.healthRating} />
+                                    {isRunningLow(item) && (
+                                      <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3" />
+                                        Low stock
+                                      </span>
+                                    )}
+                                  </div>
+                                  <TagBadges tags={item.tags} />
+                                </div>
+                                <div className="flex items-center gap-1 ml-2">
+                                  <button
+                                    onClick={() => swapSingleItem('hazel', 'crunchSip', idx)}
+                                    className="text-yellow-600 hover:text-yellow-800 text-sm flex items-center gap-1"
+                                    title="Shuffle this item"
+                                  >
+                                    <Shuffle className="w-3 h-3" />
+                                  </button>
+                                  {todaysPlan.hazel.crunchSip.length > 1 && (
+                                    <button
+                                      onClick={() => removeSlot('hazel', 'crunchSip', idx)}
+                                      className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
+                                      title="Remove this item"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <h4 className="font-semibold text-green-900 mb-3 flex items-center gap-2">
+                          <Clock className="w-4 h-4" />
+                          Lunch (10 min eating)
+                          <span className="text-xs bg-green-100 px-2 py-1 rounded-full">
+                            {todaysPlan.hazel.extras.length} extras
+                          </span>
+                          <div className="flex items-center gap-1 ml-auto">
+                            <button
+                              onClick={() => addSlot('hazel', 'extras')}
+                              className="w-6 h-6 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
+                              title="Add extra item"
+                            >
+                              +
+                            </button>
+                            {todaysPlan.hazel.extras.length > 1 && (
+                              <button
+                                onClick={() => removeSlot('hazel', 'extras', todaysPlan.hazel.extras.length - 1)}
+                                className="w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
+                                title="Remove last extra item"
+                              >
+                                −
+                              </button>
+                            )}
+                          </div>
+                        </h4>
+                        <div className="space-y-2">
+                          {todaysPlan.hazel.main.map((item, idx) => (
+                            <div key={idx} className="bg-white p-3 rounded border-l-4 border-green-500">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <div className="text-xs font-medium text-green-700 uppercase">Main</div>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        onClick={() => addSlot('hazel', 'main')}
+                                        className="w-4 h-4 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
+                                        title="Add main item"
+                                      >
+                                        +
+                                      </button>
+                                      {todaysPlan.hazel.main.length > 1 && (
+                                        <button
+                                          onClick={() => removeSlot('hazel', 'main', idx)}
+                                          className="w-4 h-4 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
+                                          title="Remove this main item"
+                                        >
+                                          −
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="font-medium">{item.name}</div>
+                                    {(() => {
+                                      const usageCount = getFoodUsageFrequency(item.id);
+                                      if (usageCount > 0) {
+                                        return (
+                                          <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                                            {usageCount}x
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
                                   <div className="flex items-center gap-2 mt-1">
                                     <StarRating rating={item.hazelRating} label="Rating" readOnly />
                                   </div>
@@ -1726,118 +2266,133 @@ const LunchboxManager = () => {
                                   <TagBadges tags={item.tags} />
                                 </div>
                                 <button
-                                  onClick={() => swapSingleItem('hazel', 'recess', idx)}
-                                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1 ml-2"
+                                  onClick={() => swapSingleItem('hazel', 'main', idx)}
+                                  className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
+                                  title="Shuffle this item"
                                 >
                                   <Shuffle className="w-3 h-3" />
                                 </button>
                               </div>
                             </div>
                           ))}
-                        </div>
-                      </div>
-
-                      <div className="bg-yellow-50 p-4 rounded-lg">
-                        <h4 className="font-semibold text-yellow-900 mb-3">Crunch & Sip</h4>
-                        <div className="bg-white p-3 rounded border-l-2 border-yellow-400">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="font-medium">{todaysPlan.hazel.crunchAndSip.name}</div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <StarRating rating={todaysPlan.hazel.crunchAndSip.hazelRating} label="Rating" readOnly />
-                              </div>
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                <PrepBadge prep={todaysPlan.hazel.crunchAndSip.prep} />
-                                <HealthBadge rating={todaysPlan.hazel.crunchAndSip.healthRating} />
-                              </div>
-                              <TagBadges tags={todaysPlan.hazel.crunchAndSip.tags} />
-                            </div>
-                            <button
-                              onClick={() => swapSingleItem('hazel', 'crunchAndSip')}
-                              className="text-yellow-600 hover:text-yellow-800 text-sm flex items-center gap-1 ml-2"
-                            >
-                              <Shuffle className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-green-50 p-4 rounded-lg">
-                        <h4 className="font-semibold text-green-900 mb-3 flex items-center gap-2">
-                          <Clock className="w-4 h-4" />
-                          Lunch (10 min eating)
-                          <span className="text-xs bg-green-100 px-2 py-1 rounded-full">
-                            {todaysPlan.hazel.extras.length} extras
-                          </span>
-                        </h4>
-                        <div className="space-y-2">
-                          <div className="bg-white p-3 rounded border-l-4 border-green-500">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="text-xs font-medium text-green-700 uppercase">Main</div>
-                                <div className="font-medium">{todaysPlan.hazel.main.name}</div>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <StarRating rating={todaysPlan.hazel.main.hazelRating} label="Rating" readOnly />
-                                </div>
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                  <PrepBadge prep={todaysPlan.hazel.main.prep} />
-                                  <HealthBadge rating={todaysPlan.hazel.main.healthRating} />
-                                </div>
-                                <TagBadges tags={todaysPlan.hazel.main.tags} />
-                              </div>
-                              <button
-                                onClick={() => swapSingleItem('hazel', 'main')}
-                                className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
-                              >
-                                <Shuffle className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
                           
-                          <div className="bg-white p-3 rounded border-l-2 border-green-300">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="text-xs font-medium text-green-700 uppercase">Veggie</div>
-                                <div className="font-medium">{todaysPlan.hazel.veggie.name}</div>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <StarRating rating={todaysPlan.hazel.veggie.hazelRating} label="Rating" readOnly />
-                                </div>
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                  <PrepBadge prep={todaysPlan.hazel.veggie.prep} />
-                                  <HealthBadge rating={todaysPlan.hazel.veggie.healthRating} />
-                                </div>
-                                <TagBadges tags={todaysPlan.hazel.veggie.tags} />
-                              </div>
-                              <button
-                                onClick={() => swapSingleItem('hazel', 'veggie')}
-                                className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
-                              >
-                                <Shuffle className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {todaysPlan.hazel.extras.map((item, idx) => (
+                          {todaysPlan.hazel.veggie.map((item, idx) => (
                             <div key={idx} className="bg-white p-3 rounded border-l-2 border-green-300">
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
-                                  <div className="text-xs font-medium text-green-700 uppercase">Extra</div>
-                                  <div className="font-medium">{item.name}</div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="text-xs font-medium text-green-700 uppercase">Veggie</div>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        onClick={() => addSlot('hazel', 'veggie')}
+                                        className="w-4 h-4 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
+                                        title="Add veggie item"
+                                      >
+                                        +
+                                      </button>
+                                      {todaysPlan.hazel.veggie.length > 1 && (
+                                        <button
+                                          onClick={() => removeSlot('hazel', 'veggie', idx)}
+                                          className="w-4 h-4 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
+                                          title="Remove this veggie item"
+                                        >
+                                          −
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="font-medium">{item.name}</div>
+                                    {(() => {
+                                      const usageCount = getFoodUsageFrequency(item.id);
+                                      if (usageCount > 0) {
+                                        return (
+                                          <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                                            {usageCount}x
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
                                   <div className="flex items-center gap-2 mt-1">
                                     <StarRating rating={item.hazelRating} label="Rating" readOnly />
                                   </div>
                                   <div className="flex flex-wrap gap-1 mt-2">
                                     <PrepBadge prep={item.prep} />
                                     <HealthBadge rating={item.healthRating} />
+                                    {isRunningLow(item) && (
+                                      <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3" />
+                                        Low stock
+                                      </span>
+                                    )}
                                   </div>
                                   <TagBadges tags={item.tags} />
                                 </div>
                                 <button
-                                  onClick={() => swapSingleItem('hazel', 'extras', idx)}
+                                  onClick={() => swapSingleItem('hazel', 'veggie', idx)}
                                   className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
+                                  title="Shuffle this item"
                                 >
                                   <Shuffle className="w-3 h-3" />
                                 </button>
+                              </div>
+                            </div>
+                          ))}
+
+                          {todaysPlan.hazel.extras.map((item, idx) => (
+                            <div key={idx} className="bg-white p-3 rounded border-l-2 border-green-300">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="text-xs font-medium text-green-700 uppercase">Extra</div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="font-medium">{item.name}</div>
+                                    {(() => {
+                                      const usageCount = getFoodUsageFrequency(item.id);
+                                      if (usageCount > 0) {
+                                        return (
+                                          <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                                            {usageCount}x
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <StarRating rating={item.hazelRating} label="Rating" readOnly />
+                                  </div>
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    <PrepBadge prep={item.prep} />
+                                    <HealthBadge rating={item.healthRating} />
+                                    {isRunningLow(item) && (
+                                      <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3" />
+                                        Low stock
+                                      </span>
+                                    )}
+                                  </div>
+                                  <TagBadges tags={item.tags} />
+                                </div>
+                                <div className="flex items-center gap-1 ml-2">
+                                  <button
+                                    onClick={() => swapSingleItem('hazel', 'extras', idx)}
+                                    className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1"
+                                    title="Shuffle this item"
+                                  >
+                                    <Shuffle className="w-3 h-3" />
+                                  </button>
+                                  {todaysPlan.hazel.extras.length > 1 && (
+                                    <button
+                                      onClick={() => removeSlot('hazel', 'extras', idx)}
+                                      className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
+                                      title="Remove this item"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -2781,13 +3336,105 @@ const LunchboxManager = () => {
                       </label>
                     </div>
                     
+                    <div className="border-t pt-4 mt-4">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3">Default Lunch Plan Slots</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Main Items: {appSettings.defaultSlots.main}
+                          </label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="3"
+                            value={appSettings.defaultSlots.main}
+                            onChange={(e) => setAppSettings({
+                              ...appSettings,
+                              defaultSlots: {
+                                ...appSettings.defaultSlots,
+                                main: parseInt(e.target.value)
+                              }
+                            })}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Recess Items: {appSettings.defaultSlots.recess}
+                          </label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="5"
+                            value={appSettings.defaultSlots.recess}
+                            onChange={(e) => setAppSettings({
+                              ...appSettings,
+                              defaultSlots: {
+                                ...appSettings.defaultSlots,
+                                recess: parseInt(e.target.value)
+                              }
+                            })}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Extra Items: {appSettings.defaultSlots.extras}
+                          </label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="5"
+                            value={appSettings.defaultSlots.extras}
+                            onChange={(e) => setAppSettings({
+                              ...appSettings,
+                              defaultSlots: {
+                                ...appSettings.defaultSlots,
+                                extras: parseInt(e.target.value)
+                              }
+                            })}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Crunch & Sip: {appSettings.defaultSlots.crunchSip}
+                          </label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="3"
+                            value={appSettings.defaultSlots.crunchSip}
+                            onChange={(e) => setAppSettings({
+                              ...appSettings,
+                              defaultSlots: {
+                                ...appSettings.defaultSlots,
+                                crunchSip: parseInt(e.target.value)
+                              }
+                            })}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">These control how many item slots new lunch plans will have by default</p>
+                    </div>
+                    
                     <button
                       onClick={() => setAppSettings({
                         maxHistoryDays: 90,
                         autoArchiveThreshold: 60,
                         defaultServings: 1,
                         showUsageInPlanning: true,
-                        compactMode: false
+                        compactMode: false,
+                        defaultSlots: {
+                          main: 1,
+                          recess: 2,
+                          extras: 2,
+                          crunchSip: 1
+                        }
                       })}
                       className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 text-sm"
                     >
