@@ -67,6 +67,35 @@ const LunchboxManager = () => {
     return today.toLocaleDateString();
   };
 
+  const formatDateWithDay = (dateString) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    
+    if (date.toDateString() === today.toDateString()) {
+      return `Today, ${dayName} ${dateStr}`;
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return `Yesterday, ${dayName} ${dateStr}`;
+    } else {
+      return `${dayName}, ${dateStr}`;
+    }
+  };
+
+  const getSlotColor = (slot) => {
+    const colors = {
+      recess: 'bg-blue-50 border-l-blue-400 text-blue-900',
+      crunchAndSip: 'bg-yellow-50 border-l-yellow-400 text-yellow-900',
+      main: 'bg-green-50 border-l-green-500 text-green-900',
+      veggie: 'bg-emerald-50 border-l-emerald-400 text-emerald-900',
+      extra: 'bg-gray-50 border-l-gray-400 text-gray-900'
+    };
+    return colors[slot] || 'bg-gray-50 border-l-gray-400 text-gray-900';
+  };
+
   const generateRecommendations = () => {
     const availableSnacks = foods.filter(f => f.category === 'snack' && f.available !== false);
     const availableFruit = foods.filter(f => f.category === 'fruit' && f.available !== false);
@@ -423,7 +452,8 @@ const LunchboxManager = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-4 bg-gray-50 min-h-screen">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
       {/* Confirmation Dialog */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -485,66 +515,101 @@ const LunchboxManager = () => {
           onCancel={() => setEditingFood(null)} 
         />
       )}
-      <div className="bg-white rounded-lg shadow-sm border mb-6">
-        <div className="p-6 border-b">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Lunchbox Manager</h1>
-          <p className="text-gray-600">ADHD-friendly lunch planning for Amelia & Hazel</p>
-        </div>
+        {/* Main App Container */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-8 text-white">
+            <h1 className="text-3xl font-bold mb-2">🍱 Lunchbox Manager</h1>
+            <p className="text-indigo-100 text-lg">ADHD-friendly lunch planning for Amelia & Hazel</p>
+          </div>
 
-        <div className="flex border-b overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('plan')}
-            className={`px-6 py-3 font-medium whitespace-nowrap ${activeTab === 'plan' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-          >
-            <Calendar className="w-4 h-4 inline mr-2" />
-            Today's Plan
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`px-6 py-3 font-medium whitespace-nowrap ${activeTab === 'history' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-          >
-            <Clock className="w-4 h-4 inline mr-2" />
-            History
-          </button>
-          <button
-            onClick={() => setActiveTab('foods')}
-            className={`px-6 py-3 font-medium whitespace-nowrap ${activeTab === 'foods' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-          >
-            <Plus className="w-4 h-4 inline mr-2" />
-            Manage Foods
-          </button>
-          <button
-            onClick={() => setActiveTab('tags')}
-            className={`px-6 py-3 font-medium whitespace-nowrap ${activeTab === 'tags' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-          >
-            Manage Tags
-          </button>
-        </div>
+          {/* Navigation Tabs */}
+          <div className="border-b border-gray-200 bg-gray-50">
+            <nav className="flex space-x-1 p-2 overflow-x-auto scrollbar-hide" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('plan')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
+                  activeTab === 'plan' 
+                    ? 'bg-blue-100 text-blue-700 shadow-sm' 
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+                }`}
+              >
+                <Calendar className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Today's Plan</span>
+                <span className="sm:hidden">Plan</span>
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('history')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
+                  activeTab === 'history' 
+                    ? 'bg-purple-100 text-purple-700 shadow-sm' 
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+                }`}
+              >
+                <Clock className="w-4 h-4 flex-shrink-0" />
+                <span>History</span>
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('foods')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
+                  activeTab === 'foods' 
+                    ? 'bg-green-100 text-green-700 shadow-sm' 
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+                }`}
+              >
+                <Plus className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Manage Foods</span>
+                <span className="sm:hidden">Foods</span>
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('tags')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
+                  activeTab === 'tags' 
+                    ? 'bg-orange-100 text-orange-700 shadow-sm' 
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+                }`}
+              >
+                <span>Tags</span>
+              </button>
+            </nav>
+          </div>
 
-        <div className="p-6">
+          {/* Content Area */}
+          <div className="p-4 sm:p-6 lg:p-8">
           {activeTab === 'plan' && (
             <div>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold">Lunchbox Plan</h2>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium">Plan for:</label>
-                    <select
-                      value={planDate}
-                      onChange={(e) => setPlanDate(e.target.value)}
-                      className="border rounded px-2 py-1 text-sm"
-                    >
-                      <option value="today">Today</option>
-                      <option value="tomorrow">Tomorrow</option>
-                    </select>
+              {/* Plan Header */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-6 border border-blue-200">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">📅 Today's Lunch Plan</h2>
+                    <p className="text-gray-600">Generate personalized lunch recommendations for both kids</p>
                   </div>
-                  <button
-                    onClick={generateRecommendations}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Generate Plan
-                  </button>
+                  
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-semibold text-gray-700">Plan for:</label>
+                      <select
+                        value={planDate}
+                        onChange={(e) => setPlanDate(e.target.value)}
+                        className="border-2 border-gray-300 rounded-lg px-3 py-2 text-sm font-medium focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                      >
+                        <option value="today">Today</option>
+                        <option value="tomorrow">Tomorrow</option>
+                      </select>
+                    </div>
+                    
+                    <button
+                      onClick={generateRecommendations}
+                      className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2 rounded-lg hover:from-blue-700 hover:to-indigo-700 flex items-center gap-2 font-medium shadow-md hover:shadow-lg transition-all duration-200"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      <span>Generate Plan</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -848,55 +913,93 @@ const LunchboxManager = () => {
                     </div>
                   </div>
 
-                  <div className="flex justify-center">
-                    <button
-                      onClick={confirmPlan}
-                      className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 flex items-center gap-2 text-lg"
-                    >
-                      <CheckCircle className="w-5 h-5" />
-                      Pack These Lunches!
-                    </button>
+                  {/* Confirm Plan Button */}
+                  <div className="flex justify-center pt-8">
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 border-2 border-green-200">
+                      <div className="text-center mb-4">
+                        <h3 className="text-lg font-semibold text-green-800 mb-2">✅ Ready to pack?</h3>
+                        <p className="text-green-700 text-sm">This will save your lunch plan to history</p>
+                      </div>
+                      <button
+                        onClick={confirmPlan}
+                        className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-4 rounded-xl hover:from-green-700 hover:to-emerald-700 flex items-center gap-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 mx-auto"
+                      >
+                        <CheckCircle className="w-6 h-6" />
+                        Pack These Lunches!
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <Clock className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-600 mb-2">No plan yet</h3>
-                  <p className="text-gray-500">Select a date and click "Generate Plan" to get recommendations</p>
+                <div className="text-center py-16 bg-white rounded-2xl border-2 border-dashed border-gray-300">
+                  <div className="bg-blue-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Clock className="w-12 h-12 text-blue-500" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-700 mb-3">No lunch plan yet</h3>
+                  <p className="text-gray-500 max-w-md mx-auto mb-6">Click "Generate Plan" above to create personalized lunch recommendations for Amelia and Hazel based on their preferences.</p>
+                  <div className="text-sm text-gray-400">
+                    💡 Tip: Plans consider food ratings, prep time, and current stock levels
+                  </div>
                 </div>
               )}
             </div>
           )}
 
           {activeTab === 'history' && (
-            <div>
+            <div className="space-y-4">
               <h2 className="text-xl font-semibold mb-6">Lunch History</h2>
               {lunchHistory.length > 0 ? (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {lunchHistory.slice(-14).reverse().map((day, idx) => (
-                    <div key={idx} className="border rounded-lg p-4 bg-white">
-                      <h3 className="font-medium mb-4 text-center text-lg text-gray-700">{day.date}</h3>
-                      <div className="grid lg:grid-cols-2 gap-6">
-                        <div>
-                          <h4 className="font-medium text-purple-600 mb-3">Amelia's Lunch</h4>
-                          <div className="space-y-2 text-sm">
-                            {day.amelia.map((item, i) => (
-                              <div key={i} className="bg-gray-50 p-2 rounded">
-                                <span className="font-medium text-xs text-gray-600 uppercase">{item.slot}</span>
-                                <div>{item.name}</div>
-                              </div>
-                            ))}    
+                    <div key={idx} className="bg-white border-2 border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                      {/* Date Header */}
+                      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3 rounded-t-xl border-b border-gray-200">
+                        <h3 className="font-semibold text-lg text-gray-800 text-center">
+                          {formatDateWithDay(day.date)}
+                        </h3>
+                      </div>
+                      
+                      {/* Lunch Content */}
+                      <div className="p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Amelia's Lunch */}
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                              <h4 className="font-semibold text-purple-700">Amelia's Lunch</h4>
+                            </div>
+                            <div className="space-y-1">
+                              {day.amelia.map((item, i) => (
+                                <div key={i} className={`p-2 rounded-lg border-l-4 ${getSlotColor(item.slot)}`}>
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-medium text-xs uppercase tracking-wide opacity-75">
+                                      {item.slot === 'crunchAndSip' ? 'Crunch & Sip' : item.slot}
+                                    </span>
+                                  </div>
+                                  <div className="font-medium text-sm mt-1">{item.name}</div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-pink-600 mb-3">Hazel's Lunch</h4>
-                          <div className="space-y-2 text-sm">
-                            {day.hazel.map((item, i) => (
-                              <div key={i} className="bg-gray-50 p-2 rounded">
-                                <span className="font-medium text-xs text-gray-600 uppercase">{item.slot}</span>
-                                <div>{item.name}</div>
-                              </div>
-                            ))}
+
+                          {/* Hazel's Lunch */}
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-3 h-3 bg-pink-500 rounded-full"></div>
+                              <h4 className="font-semibold text-pink-700">Hazel's Lunch</h4>
+                            </div>
+                            <div className="space-y-1">
+                              {day.hazel.map((item, i) => (
+                                <div key={i} className={`p-2 rounded-lg border-l-4 ${getSlotColor(item.slot)}`}>
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-medium text-xs uppercase tracking-wide opacity-75">
+                                      {item.slot === 'crunchAndSip' ? 'Crunch & Sip' : item.slot}
+                                    </span>
+                                  </div>
+                                  <div className="font-medium text-sm mt-1">{item.name}</div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -904,9 +1007,10 @@ const LunchboxManager = () => {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <Calendar className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                  <p className="text-gray-500">No lunch history yet. Pack your first lunch!</p>
+                <div className="text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-300">
+                  <Calendar className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-600 mb-2">No lunch history yet</h3>
+                  <p className="text-gray-500 max-w-sm mx-auto">Start planning lunches to see your history here. Each confirmed plan will be saved for future reference.</p>
                 </div>
               )}
             </div>
@@ -1197,6 +1301,7 @@ const LunchboxManager = () => {
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
