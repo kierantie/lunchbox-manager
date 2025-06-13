@@ -14,6 +14,7 @@ const LunchboxManager = () => {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [confirmDeleteTag, setConfirmDeleteTag] = useState(null);
   const [showAllHistory, setShowAllHistory] = useState(false);
+  const [showPackedConfirmation, setShowPackedConfirmation] = useState(false);
   const [newFood, setNewFood] = useState({
     name: '',
     category: 'snack', 
@@ -111,33 +112,392 @@ const LunchboxManager = () => {
     return colors[slot] || 'bg-gray-50 border-l-gray-400 text-gray-900';
   };
 
-  const generateRecommendations = () => {
-    const availableSnacks = foods.filter(f => f.category === 'snack' && f.available !== false);
-    const availableFruit = foods.filter(f => f.category === 'fruit' && f.available !== false);
-    const availableMains = foods.filter(f => f.category === 'main' && f.available !== false);
-    const availableVeggies = foods.filter(f => f.category === 'veggie' && f.available !== false);
+  // Helper function to filter foods by child's preferences
+  const getFilteredFoods = (foods, child) => {
+    return foods.filter(f => {
+      if (f.available === false) return false;
+      const rating = child === 'amelia' ? f.ameliaRating : f.hazelRating;
+      return rating > 0; // Never include 0-star foods
+    });
+  };
 
-    const getRandomItems = (items, count) => {
-      const shuffled = [...items].sort(() => 0.5 - Math.random());
-      return shuffled.slice(0, count);
+  // Helper function to sort foods by preference rating (highest first)
+  const sortByPreference = (foods, child) => {
+    return [...foods].sort((a, b) => {
+      const ratingA = child === 'amelia' ? a.ameliaRating : a.hazelRating;
+      const ratingB = child === 'amelia' ? b.ameliaRating : b.hazelRating;
+      return ratingB - ratingA;
+    });
+  };
+
+  // Helper function to select items with preference weighting and variety
+  const selectPreferredItems = (foods, count, child, usedTags = []) => {
+    if (foods.length === 0) return [];
+    
+    const sorted = sortByPreference(foods, child);
+    const selected = [];
+    const childRating = child === 'amelia' ? 'ameliaRating' : 'hazelRating';
+    
+    // Group foods by rating
+    const highRated = sorted.filter(f => f[childRating] >= 4);
+    const mediumRated = sorted.filter(f => f[childRating] === 3);
+    const lowRated = sorted.filter(f => f[childRating] <= 2 && f[childRating] > 0);
+    
+    // Try to fill with high-rated items first, then medium, then low as fallback
+    const pools = [highRated, mediumRated, lowRated];
+    
+    for (let i = 0; i < count && selected.length < count; i++) {
+      let selectedItem = null;
+      
+      // Try each rating pool
+      for (const pool of pools) {
+        if (pool.length === 0) continue;
+        
+        // Filter out already selected items and promote variety
+        const availableItems = pool.filter(item => 
+          !selected.some(s => s.id === item.id) &&
+          (!usedTags.length || !item.tags.some(tag => usedTags.includes(tag)))
+        );
+        
+        if (availableItems.length > 0) {
+          // Select randomly from top items in this rating pool
+          const topItems = availableItems.slice(0, Math.min(3, availableItems.length));
+          selectedItem = topItems[Math.floor(Math.random() * topItems.length)];
+          break;
+        }
+      }
+      
+      // If no item found with variety, just pick from any available
+      if (!selectedItem) {
+        const remainingItems = sorted.filter(item => 
+          !selected.some(s => s.id === item.id)
+        );
+        if (remainingItems.length > 0) {
+          selectedItem = remainingItems[0];
+        }
+      }
+      
+      if (selectedItem) {
+        selected.push(selectedItem);
+        // Track tags for variety
+        usedTags.push(...selectedItem.tags);
+      }
+    }
+    
+    return selected;
+  };
+
+  // Helper function to calculate dynamic quantities based on main dish rating
+  const getDynamicQuantities = (mainRating) => {
+    return {
+      recessCount: mainRating >= 4 ? 2 : 3,
+      extrasCount: mainRating >= 4 ? 2 : 3
+    };
+  };
+
+  // Helper function to get foods used in last N days for a specific child
+  const getRecentlyUsedFoods = (child, days = 2) => {
+    const recentHistory = lunchHistory.slice(-days);
+    const usedFoodIds = new Set();
+    
+    recentHistory.forEach(day => {
+      if (day[child]) {
+        day[child].forEach(item => {
+          usedFoodIds.add(item.id);
+        });
+      }
+    });
+    
+    return usedFoodIds;
+  };
+
+  // History-aware version of selectPreferredItems that deprioritizes recently used foods
+  const selectPreferredItemsWithHistory = (foods, count, child, usedTags = [], includeRecentHistory = true) => {
+    if (foods.length === 0) return [];
+    
+    const recentlyUsedIds = includeRecentHistory ? getRecentlyUsedFoods(child) : new Set();
+    const sorted = sortByPreference(foods, child);
+    const selected = [];
+    const childRating = child === 'amelia' ? 'ameliaRating' : 'hazelRating';
+    
+    // Apply history penalty: reduce effective rating for recently used foods
+    const adjustedFoods = sorted.map(food => ({
+      ...food,
+      effectiveRating: recentlyUsedIds.has(food.id) ? Math.max(1, food[childRating] - 1.5) : food[childRating]
+    }));
+    
+    // Re-sort by effective rating
+    const reSorted = adjustedFoods.sort((a, b) => b.effectiveRating - a.effectiveRating);
+    
+    // Group by effective rating
+    const highRated = reSorted.filter(f => f.effectiveRating >= 4);
+    const mediumRated = reSorted.filter(f => f.effectiveRating >= 2.5 && f.effectiveRating < 4);
+    const lowRated = reSorted.filter(f => f.effectiveRating < 2.5 && f.effectiveRating > 0);
+    
+    const pools = [highRated, mediumRated, lowRated];
+    
+    for (let i = 0; i < count && selected.length < count; i++) {
+      let selectedItem = null;
+      
+      // Try each rating pool
+      for (const pool of pools) {
+        if (pool.length === 0) continue;
+        
+        // Filter out already selected items and promote variety
+        const availableItems = pool.filter(item => 
+          !selected.some(s => s.id === item.id) &&
+          (!usedTags.length || !item.tags.some(tag => usedTags.includes(tag)))
+        );
+        
+        if (availableItems.length > 0) {
+          // Select randomly from top items in this rating pool, but prefer non-recent items
+          const nonRecentItems = availableItems.filter(item => !recentlyUsedIds.has(item.id));
+          const itemsToChooseFrom = nonRecentItems.length > 0 ? nonRecentItems : availableItems;
+          
+          const topItems = itemsToChooseFrom.slice(0, Math.min(3, itemsToChooseFrom.length));
+          selectedItem = topItems[Math.floor(Math.random() * topItems.length)];
+          break;
+        }
+      }
+      
+      // If no item found with variety, just pick from any available
+      if (!selectedItem) {
+        const remainingItems = reSorted.filter(item => 
+          !selected.some(s => s.id === item.id)
+        );
+        if (remainingItems.length > 0) {
+          const nonRecentItems = remainingItems.filter(item => !recentlyUsedIds.has(item.id));
+          const itemsToChooseFrom = nonRecentItems.length > 0 ? nonRecentItems : remainingItems;
+          selectedItem = itemsToChooseFrom[0];
+        }
+      }
+      
+      if (selectedItem) {
+        selected.push(selectedItem);
+        // Track tags for variety
+        usedTags.push(...selectedItem.tags);
+      }
+    }
+    
+    return selected;
+  };
+
+  const shuffleEntireLunchbox = (child) => {
+    if (!todaysPlan) return;
+
+    const planDate = todaysPlan.date;
+    const dateObj = new Date(planDate);
+    const dayOfWeek = dateObj.getDay();
+    
+    // Helper function to add randomness to selection
+    const selectRandomPreferredItems = (foods, count, child, usedTags = []) => {
+      if (foods.length === 0) return [];
+      
+      const sorted = sortByPreference(foods, child);
+      const selected = [];
+      const childRating = child === 'amelia' ? 'ameliaRating' : 'hazelRating';
+      
+      // Group foods by rating with some randomness
+      const highRated = sorted.filter(f => f[childRating] >= 4);
+      const mediumRated = sorted.filter(f => f[childRating] === 3);
+      const lowRated = sorted.filter(f => f[childRating] <= 2 && f[childRating] > 0);
+      
+      // Add more randomness by shuffling within each rating group
+      const shuffleArray = (array) => {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+      };
+      
+      const pools = [shuffleArray(highRated), shuffleArray(mediumRated), shuffleArray(lowRated)];
+      
+      for (let i = 0; i < count && selected.length < count; i++) {
+        let selectedItem = null;
+        
+        // Try each rating pool with some randomness
+        for (const pool of pools) {
+          if (pool.length === 0) continue;
+          
+          const availableItems = pool.filter(item => 
+            !selected.some(s => s.id === item.id) &&
+            (!usedTags.length || !item.tags.some(tag => usedTags.includes(tag)))
+          );
+          
+          if (availableItems.length > 0) {
+            // Pick randomly from available items instead of always taking the first
+            selectedItem = availableItems[Math.floor(Math.random() * availableItems.length)];
+            break;
+          }
+        }
+        
+        // Fallback: pick any remaining item randomly
+        if (!selectedItem) {
+          const remainingItems = sorted.filter(item => 
+            !selected.some(s => s.id === item.id)
+          );
+          if (remainingItems.length > 0) {
+            selectedItem = remainingItems[Math.floor(Math.random() * remainingItems.length)];
+          }
+        }
+        
+        if (selectedItem) {
+          selected.push(selectedItem);
+          usedTags.push(...selectedItem.tags);
+        }
+      }
+      
+      return selected;
+    };
+
+    const shouldIncludeTreat = (child) => {
+      const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][dayOfWeek];
+      
+      if (child === 'hazel' && dayName === 'monday') return true;
+      if (child === 'amelia' && dayName === 'thursday') return true;
+      if (dayName === 'friday') return true;
+      
+      return false;
+    };
+
+    const getChildFoods = (category, child) => {
+      const categoryFoods = foods.filter(f => f.category === category);
+      return getFilteredFoods(categoryFoods, child);
+    };
+
+    const generateChildPlan = (child) => {
+      const snacks = getChildFoods('snack', child);
+      const fruits = getChildFoods('fruit', child);
+      const mains = getChildFoods('main', child);
+      const veggies = getChildFoods('veggie', child);
+      
+      // Use random selection for shuffle (ignores history for true randomness)
+      const selectedMain = selectRandomPreferredItems(mains, 1, child)[0];
+      const mainRating = selectedMain ? (child === 'amelia' ? selectedMain.ameliaRating : selectedMain.hazelRating) : 3;
+      
+      const { recessCount, extrasCount } = getDynamicQuantities(mainRating);
+      
+      const recessFoods = [...snacks, ...fruits]; // Recess can have snacks and fruits
+      const lunchExtrasFoods = [...snacks, ...fruits]; // Lunch extras can include fruits for variety
+      const usedTags = selectedMain ? [...selectedMain.tags] : [];
+      
+      const recessItems = selectRandomPreferredItems(recessFoods, recessCount, child, [...usedTags]);
+      recessItems.forEach(item => usedTags.push(...item.tags));
+      
+      const crunchAndSipItem = selectRandomPreferredItems(fruits, 1, child, [...usedTags])[0];
+      if (crunchAndSipItem) usedTags.push(...crunchAndSipItem.tags);
+      
+      const veggieItem = selectRandomPreferredItems(veggies, 1, child, [...usedTags])[0];
+      if (veggieItem) usedTags.push(...veggieItem.tags);
+      
+      let extrasItems = selectRandomPreferredItems(lunchExtrasFoods, extrasCount, child, [...usedTags]);
+      
+      if (shouldIncludeTreat(child) && extrasItems.length < extrasCount) {
+        const treats = getChildFoods('snack', child).filter(f => f.tags.includes('treat'));
+        const treatItem = selectRandomPreferredItems(treats, 1, child, [...usedTags])[0];
+        if (treatItem) {
+          extrasItems = [treatItem, ...extrasItems.slice(0, extrasCount - 1)];
+        }
+      }
+      
+      return {
+        recess: recessItems,
+        crunchAndSip: crunchAndSipItem || fruits[0] || null,
+        main: selectedMain || mains[0] || null,
+        veggie: veggieItem || veggies[0] || null,
+        extras: extrasItems
+      };
+    };
+
+    // Generate new plan for this child only
+    const newChildPlan = generateChildPlan(child);
+    
+    // Update just this child's plan
+    const updatedPlan = {
+      ...todaysPlan,
+      [child]: newChildPlan
+    };
+
+    setTodaysPlan(updatedPlan);
+  };
+
+
+  const generateRecommendations = () => {
+    const planDate = getPlanDate();
+    const dateObj = new Date(planDate);
+    const dayOfWeek = dateObj.getDay(); // 0=Sunday, 1=Monday, etc.
+
+    // Determine if treats should be included based on day
+    const shouldIncludeTreat = (child) => {
+      const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][dayOfWeek];
+      
+      if (child === 'hazel' && dayName === 'monday') return true;
+      if (child === 'amelia' && dayName === 'thursday') return true;
+      if (dayName === 'friday') return true; // Both kids
+      
+      return false;
+    };
+
+    // Get foods by category with child preferences
+    const getChildFoods = (category, child) => {
+      const categoryFoods = foods.filter(f => f.category === category);
+      return getFilteredFoods(categoryFoods, child);
+    };
+
+    // Generate plan for each child
+    const generateChildPlan = (child) => {
+      const snacks = getChildFoods('snack', child);
+      const fruits = getChildFoods('fruit', child);
+      const mains = getChildFoods('main', child);
+      const veggies = getChildFoods('veggie', child);
+      
+      // Select main dish first using history-aware selection
+      const selectedMain = selectPreferredItemsWithHistory(mains, 1, child)[0];
+      const mainRating = selectedMain ? (child === 'amelia' ? selectedMain.ameliaRating : selectedMain.hazelRating) : 3;
+      
+      // Determine quantities based on main rating
+      const { recessCount, extrasCount } = getDynamicQuantities(mainRating);
+      
+      const recessFoods = [...snacks, ...fruits]; // Recess can have snacks and fruits
+      const lunchExtrasFoods = [...snacks, ...fruits]; // Lunch extras can include fruits for variety
+      const usedTags = selectedMain ? [...selectedMain.tags] : [];
+      
+      // Select items using history-aware selection
+      const recessItems = selectPreferredItemsWithHistory(recessFoods, recessCount, child, [...usedTags]);
+      recessItems.forEach(item => usedTags.push(...item.tags));
+      
+      const crunchAndSipItem = selectPreferredItemsWithHistory(fruits, 1, child, [...usedTags])[0];
+      if (crunchAndSipItem) usedTags.push(...crunchAndSipItem.tags);
+      
+      const veggieItem = selectPreferredItemsWithHistory(veggies, 1, child, [...usedTags])[0];
+      if (veggieItem) usedTags.push(...veggieItem.tags);
+      
+      let extrasItems = selectPreferredItemsWithHistory(lunchExtrasFoods, extrasCount, child, [...usedTags]);
+      
+      // Add treat if it's a treat day and we have room
+      if (shouldIncludeTreat(child) && extrasItems.length < extrasCount) {
+        const treats = getChildFoods('snack', child).filter(f => f.tags.includes('treat'));
+        const treatItem = selectPreferredItemsWithHistory(treats, 1, child, [...usedTags])[0];
+        if (treatItem) {
+          extrasItems = [treatItem, ...extrasItems.slice(0, extrasCount - 1)];
+        }
+      }
+      
+      return {
+        recess: recessItems,
+        crunchAndSip: crunchAndSipItem || fruits[0] || null,
+        main: selectedMain || mains[0] || null,
+        veggie: veggieItem || veggies[0] || null,
+        extras: extrasItems
+      };
     };
 
     const plan = {
-      date: getPlanDate(),
-      amelia: {
-        recess: getRandomItems([...availableSnacks, ...availableFruit], 3),
-        crunchAndSip: getRandomItems(availableFruit, 1)[0] || availableFruit[0],
-        main: getRandomItems(availableMains, 1)[0] || availableMains[0],
-        veggie: getRandomItems(availableVeggies, 1)[0] || availableVeggies[0],
-        extras: getRandomItems([...availableSnacks, ...availableFruit], 2)
-      },
-      hazel: {
-        recess: getRandomItems([...availableSnacks, ...availableFruit], 3),
-        crunchAndSip: getRandomItems(availableFruit, 1)[0] || availableFruit[0],
-        main: getRandomItems(availableMains, 1)[0] || availableMains[0],
-        veggie: getRandomItems(availableVeggies, 1)[0] || availableVeggies[0],
-        extras: getRandomItems([...availableSnacks, ...availableFruit], 2)
-      }
+      date: planDate,
+      amelia: generateChildPlan('amelia'),
+      hazel: generateChildPlan('hazel')
     };
 
     setTodaysPlan(plan);
@@ -238,49 +598,112 @@ const LunchboxManager = () => {
     );
   };
 
-  const swapItem = (child, category, slot) => {
+  const swapSingleItem = (child, slot, itemIndex = null) => {
     if (!todaysPlan) return;
-
-    const availableItems = foods.filter(f => {
-      if (category === 'mixed') {
-        return (f.category === 'snack' || f.category === 'fruit') && f.available !== false;
-      }
-      return f.category === category && f.available !== false;
-    });
 
     const updatedPlan = { ...todaysPlan };
     
-    if (slot === 'recess') {
-      // For recess, regenerate the entire selection
-      const getRandomItems = (items, count) => {
-        const shuffled = [...items].sort(() => 0.5 - Math.random());
-        return shuffled.slice(0, count);
-      };
-      updatedPlan[child][slot] = getRandomItems(availableItems, 3);
-    } else {
-      // For other items, swap individual items
-      const currentItems = Array.isArray(todaysPlan[child][slot]) ? 
-        todaysPlan[child][slot] : [todaysPlan[child][slot]];
-      
-      const unusedItems = availableItems.filter(item => 
-        !currentItems.some(current => current && current.id === item.id)
-      );
-
-      if (unusedItems.length === 0) return;
-
-      const newItem = unusedItems[Math.floor(Math.random() * unusedItems.length)];
-      
-      if (Array.isArray(updatedPlan[child][slot])) {
-        const randomIndex = Math.floor(Math.random() * updatedPlan[child][slot].length);
-        updatedPlan[child][slot] = [...updatedPlan[child][slot]];
-        updatedPlan[child][slot][randomIndex] = newItem;
-      } else {
-        updatedPlan[child][slot] = newItem;
-      }
+    // Get all currently used items to avoid duplicates
+    const allCurrentItems = [
+      ...(Array.isArray(updatedPlan[child].recess) ? updatedPlan[child].recess : []),
+      updatedPlan[child].crunchAndSip,
+      updatedPlan[child].main,
+      updatedPlan[child].veggie,
+      ...(Array.isArray(updatedPlan[child].extras) ? updatedPlan[child].extras : [])
+    ].filter(Boolean);
+    
+    const usedIds = allCurrentItems.map(item => item.id);
+    
+    let availableItems = [];
+    let currentItem = null;
+    
+    // Determine what we're swapping and get available alternatives
+    if (slot === 'main') {
+      availableItems = getFilteredFoods(foods.filter(f => f.category === 'main'), child);
+      currentItem = updatedPlan[child].main;
+    } else if (slot === 'veggie') {
+      availableItems = getFilteredFoods(foods.filter(f => f.category === 'veggie'), child);
+      currentItem = updatedPlan[child].veggie;
+    } else if (slot === 'crunchAndSip') {
+      availableItems = getFilteredFoods(foods.filter(f => f.category === 'fruit'), child);
+      currentItem = updatedPlan[child].crunchAndSip;
+    } else if (slot === 'recess' && itemIndex !== null) {
+      const snacks = foods.filter(f => f.category === 'snack');
+      const fruits = foods.filter(f => f.category === 'fruit');
+      availableItems = getFilteredFoods([...snacks, ...fruits], child);
+      currentItem = updatedPlan[child].recess[itemIndex];
+    } else if (slot === 'extras' && itemIndex !== null) {
+      const snacks = foods.filter(f => f.category === 'snack');
+      const fruits = foods.filter(f => f.category === 'fruit');
+      availableItems = getFilteredFoods([...snacks, ...fruits], child);
+      currentItem = updatedPlan[child].extras[itemIndex];
     }
-
+    
+    if (!currentItem || availableItems.length === 0) return;
+    
+    // Find alternatives excluding current item and other used items
+    const alternatives = availableItems.filter(food => 
+      food.id !== currentItem.id && !usedIds.includes(food.id)
+    );
+    
+    if (alternatives.length === 0) return;
+    
+    // Select new item with preference weighting
+    const newItem = selectPreferredItems(alternatives, 1, child, [])[0];
+    if (!newItem) return;
+    
+    // Update the specific item
+    if (slot === 'main' || slot === 'veggie' || slot === 'crunchAndSip') {
+      updatedPlan[child][slot] = newItem;
+      
+      // If main changed, recalculate dynamic quantities
+      if (slot === 'main') {
+        const newMainRating = child === 'amelia' ? newItem.ameliaRating : newItem.hazelRating;
+        const { recessCount, extrasCount } = getDynamicQuantities(newMainRating);
+        
+        // Adjust arrays if needed
+        if (updatedPlan[child].recess.length !== recessCount) {
+          if (recessCount > updatedPlan[child].recess.length) {
+            // Add more items
+            const snacks = foods.filter(f => f.category === 'snack');
+            const fruits = foods.filter(f => f.category === 'fruit');
+            const mixedFoods = getFilteredFoods([...snacks, ...fruits], child);
+            const moreItems = selectPreferredItems(mixedFoods, recessCount - updatedPlan[child].recess.length, child, []);
+            updatedPlan[child].recess = [...updatedPlan[child].recess, ...moreItems];
+          } else {
+            // Remove items
+            updatedPlan[child].recess = updatedPlan[child].recess.slice(0, recessCount);
+          }
+        }
+        
+        if (updatedPlan[child].extras.length !== extrasCount) {
+          if (extrasCount > updatedPlan[child].extras.length) {
+            // Add more items
+            const snacks = foods.filter(f => f.category === 'snack');
+            const fruits = foods.filter(f => f.category === 'fruit');
+            const mixedFoods = getFilteredFoods([...snacks, ...fruits], child);
+            const moreItems = selectPreferredItems(mixedFoods, extrasCount - updatedPlan[child].extras.length, child, []);
+            updatedPlan[child].extras = [...updatedPlan[child].extras, ...moreItems];
+          } else {
+            // Remove items
+            updatedPlan[child].extras = updatedPlan[child].extras.slice(0, extrasCount);
+          }
+        }
+      }
+    } else if (slot === 'recess' && itemIndex !== null) {
+      const newRecess = [...updatedPlan[child].recess];
+      newRecess[itemIndex] = newItem;
+      updatedPlan[child].recess = newRecess;
+    } else if (slot === 'extras' && itemIndex !== null) {
+      const newExtras = [...updatedPlan[child].extras];
+      newExtras[itemIndex] = newItem;
+      updatedPlan[child].extras = newExtras;
+    }
+    
     setTodaysPlan(updatedPlan);
   };
+
+
 
   const confirmPlan = () => {
     if (todaysPlan) {
@@ -301,8 +724,18 @@ const LunchboxManager = () => {
           ...todaysPlan.hazel.extras.map(item => ({...item, slot: 'extra'}))
         ]
       };
+      
+      // TODO: Here we would deduct from stock levels for items that have servings
+      // For now we just save to history
+      
       setLunchHistory([...lunchHistory, historyEntry]);
       setTodaysPlan(null);
+      setShowPackedConfirmation(true);
+      
+      // Auto-hide confirmation after 3 seconds
+      setTimeout(() => {
+        setShowPackedConfirmation(false);
+      }, 3000);
     }
   };
 
@@ -530,12 +963,20 @@ const LunchboxManager = () => {
           onCancel={() => setEditingFood(null)} 
         />
       )}
+        {/* Packed Confirmation Banner */}
+        {showPackedConfirmation && (
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2">
+            <CheckCircle className="w-5 h-5" />
+            <span className="font-medium">Lunches packed successfully! 🎉</span>
+          </div>
+        )}
+
         {/* Main App Container */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-8 text-white">
-            <h1 className="text-3xl font-bold mb-2">🍱 Lunchbox Manager</h1>
-            <p className="text-indigo-100 text-lg">ADHD-friendly lunch planning for Amelia & Hazel</p>
+          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 sm:px-6 py-4 sm:py-8 text-white">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">🍱 Lunchbox Manager</h1>
+            <p className="text-indigo-100 text-sm sm:text-lg">ADHD-friendly lunch planning for Amelia & Hazel</p>
           </div>
 
           {/* Navigation Tabs */}
@@ -636,68 +1077,82 @@ const LunchboxManager = () => {
                   
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-purple-600 border-b-2 border-purple-200 pb-2">
-                        Amelia's Lunchbox
-                      </h3>
+                      <div className="flex justify-between items-center border-b-2 border-purple-200 pb-2">
+                        <h3 className="text-lg font-semibold text-purple-600">
+                          Amelia's Lunchbox
+                        </h3>
+                        <button
+                          onClick={() => shuffleEntireLunchbox('amelia')}
+                          className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg hover:bg-purple-200 flex items-center gap-2 font-medium border-2 border-purple-200 transition-all duration-200"
+                        >
+                          <Shuffle className="w-4 h-4" />
+                          Shuffle Everything
+                        </button>
+                      </div>
                       
                       <div className="bg-blue-50 p-4 rounded-lg">
-                        <div className="flex justify-between items-center mb-3">
-                          <h4 className="font-semibold text-blue-900 flex items-center gap-2">
-                            <Clock className="w-4 h-4" />
-                            Recess (10 min)
-                          </h4>
-                          <button
-                            onClick={() => swapItem('amelia', 'mixed', 'recess')}
-                            className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-                          >
-                            <Shuffle className="w-3 h-3" />
-                            Swap
-                          </button>
-                        </div>
+                        <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                          <Clock className="w-4 h-4" />
+                          Recess (10 min) 
+                          <span className="text-xs bg-blue-100 px-2 py-1 rounded-full">
+                            {todaysPlan.amelia.recess.length} items
+                          </span>
+                        </h4>
                         <div className="space-y-2">
                           {todaysPlan.amelia.recess.map((item, idx) => (
                             <div key={idx} className="bg-white p-3 rounded border-l-2 border-blue-400">
-                              <div className="font-medium">{item.name}</div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <StarRating rating={item.ameliaRating} label="Rating" readOnly />
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="font-medium">{item.name}</div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <StarRating rating={item.ameliaRating} label="Rating" readOnly />
+                                  </div>
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    <PrepBadge prep={item.prep} />
+                                    <HealthBadge rating={item.healthRating} />
+                                    {isRunningLow(item) && (
+                                      <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3" />
+                                        Low stock
+                                      </span>
+                                    )}
+                                  </div>
+                                  <TagBadges tags={item.tags} />
+                                </div>
+                                <button
+                                  onClick={() => swapSingleItem('amelia', 'recess', idx)}
+                                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1 ml-2"
+                                >
+                                  <Shuffle className="w-3 h-3" />
+                                </button>
                               </div>
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                <PrepBadge prep={item.prep} />
-                                <HealthBadge rating={item.healthRating} />
-                                {isRunningLow(item) && (
-                                  <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 flex items-center gap-1">
-                                    <AlertTriangle className="w-3 h-3" />
-                                    Low stock
-                                  </span>
-                                )}
-                              </div>
-                              <TagBadges tags={item.tags} />
                             </div>
                           ))}
                         </div>
                       </div>
 
                       <div className="bg-yellow-50 p-4 rounded-lg">
-                        <div className="flex justify-between items-center mb-3">
-                          <h4 className="font-semibold text-yellow-900">Crunch & Sip</h4>
-                          <button
-                            onClick={() => swapItem('amelia', 'fruit', 'crunchAndSip')}
-                            className="text-yellow-600 hover:text-yellow-800 text-sm flex items-center gap-1"
-                          >
-                            <Shuffle className="w-3 h-3" />
-                            Swap
-                          </button>
-                        </div>
+                        <h4 className="font-semibold text-yellow-900 mb-3">Crunch & Sip</h4>
                         <div className="bg-white p-3 rounded border-l-2 border-yellow-400">
-                          <div className="font-medium">{todaysPlan.amelia.crunchAndSip.name}</div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <StarRating rating={todaysPlan.amelia.crunchAndSip.ameliaRating} label="Rating" readOnly />
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="font-medium">{todaysPlan.amelia.crunchAndSip.name}</div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <StarRating rating={todaysPlan.amelia.crunchAndSip.ameliaRating} label="Rating" readOnly />
+                              </div>
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                <PrepBadge prep={todaysPlan.amelia.crunchAndSip.prep} />
+                                <HealthBadge rating={todaysPlan.amelia.crunchAndSip.healthRating} />
+                              </div>
+                              <TagBadges tags={todaysPlan.amelia.crunchAndSip.tags} />
+                            </div>
+                            <button
+                              onClick={() => swapSingleItem('amelia', 'crunchAndSip')}
+                              className="text-yellow-600 hover:text-yellow-800 text-sm flex items-center gap-1 ml-2"
+                            >
+                              <Shuffle className="w-3 h-3" />
+                            </button>
                           </div>
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            <PrepBadge prep={todaysPlan.amelia.crunchAndSip.prep} />
-                            <HealthBadge rating={todaysPlan.amelia.crunchAndSip.healthRating} />
-                          </div>
-                          <TagBadges tags={todaysPlan.amelia.crunchAndSip.tags} />
                         </div>
                       </div>
 
@@ -705,6 +1160,9 @@ const LunchboxManager = () => {
                         <h4 className="font-semibold text-green-900 mb-3 flex items-center gap-2">
                           <Clock className="w-4 h-4" />
                           Lunch (10 min eating)
+                          <span className="text-xs bg-green-100 px-2 py-1 rounded-full">
+                            {todaysPlan.amelia.extras.length} extras
+                          </span>
                         </h4>
                         <div className="space-y-2">
                           <div className="bg-white p-3 rounded border-l-4 border-green-500">
@@ -722,7 +1180,7 @@ const LunchboxManager = () => {
                                 <TagBadges tags={todaysPlan.amelia.main.tags} />
                               </div>
                               <button
-                                onClick={() => swapItem('amelia', 'main', 'main')}
+                                onClick={() => swapSingleItem('amelia', 'main')}
                                 className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
                               >
                                 <Shuffle className="w-3 h-3" />
@@ -745,7 +1203,7 @@ const LunchboxManager = () => {
                                 <TagBadges tags={todaysPlan.amelia.veggie.tags} />
                               </div>
                               <button
-                                onClick={() => swapItem('amelia', 'veggie', 'veggie')}
+                                onClick={() => swapSingleItem('amelia', 'veggie')}
                                 className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
                               >
                                 <Shuffle className="w-3 h-3" />
@@ -769,7 +1227,7 @@ const LunchboxManager = () => {
                                   <TagBadges tags={item.tags} />
                                 </div>
                                 <button
-                                  onClick={() => swapItem('amelia', 'mixed', 'extras')}
+                                  onClick={() => swapSingleItem('amelia', 'extras', idx)}
                                   className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
                                 >
                                   <Shuffle className="w-3 h-3" />
@@ -782,68 +1240,82 @@ const LunchboxManager = () => {
                     </div>
 
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-pink-600 border-b-2 border-pink-200 pb-2">
-                        Hazel's Lunchbox
-                      </h3>
+                      <div className="flex justify-between items-center border-b-2 border-pink-200 pb-2">
+                        <h3 className="text-lg font-semibold text-pink-600">
+                          Hazel's Lunchbox
+                        </h3>
+                        <button
+                          onClick={() => shuffleEntireLunchbox('hazel')}
+                          className="bg-pink-100 text-pink-700 px-4 py-2 rounded-lg hover:bg-pink-200 flex items-center gap-2 font-medium border-2 border-pink-200 transition-all duration-200"
+                        >
+                          <Shuffle className="w-4 h-4" />
+                          Shuffle Everything
+                        </button>
+                      </div>
                       
                       <div className="bg-blue-50 p-4 rounded-lg">
-                        <div className="flex justify-between items-center mb-3">
-                          <h4 className="font-semibold text-blue-900 flex items-center gap-2">
-                            <Clock className="w-4 h-4" />
-                            Recess (10 min)
-                          </h4>
-                          <button
-                            onClick={() => swapItem('hazel', 'mixed', 'recess')}
-                            className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-                          >
-                            <Shuffle className="w-3 h-3" />
-                            Swap
-                          </button>
-                        </div>
+                        <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                          <Clock className="w-4 h-4" />
+                          Recess (10 min)
+                          <span className="text-xs bg-blue-100 px-2 py-1 rounded-full">
+                            {todaysPlan.hazel.recess.length} items
+                          </span>
+                        </h4>
                         <div className="space-y-2">
                           {todaysPlan.hazel.recess.map((item, idx) => (
                             <div key={idx} className="bg-white p-3 rounded border-l-2 border-blue-400">
-                              <div className="font-medium">{item.name}</div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <StarRating rating={item.hazelRating} label="Rating" readOnly />
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="font-medium">{item.name}</div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <StarRating rating={item.hazelRating} label="Rating" readOnly />
+                                  </div>
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    <PrepBadge prep={item.prep} />
+                                    <HealthBadge rating={item.healthRating} />
+                                    {isRunningLow(item) && (
+                                      <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3" />
+                                        Low stock
+                                      </span>
+                                    )}
+                                  </div>
+                                  <TagBadges tags={item.tags} />
+                                </div>
+                                <button
+                                  onClick={() => swapSingleItem('hazel', 'recess', idx)}
+                                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1 ml-2"
+                                >
+                                  <Shuffle className="w-3 h-3" />
+                                </button>
                               </div>
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                <PrepBadge prep={item.prep} />
-                                <HealthBadge rating={item.healthRating} />
-                                {isRunningLow(item) && (
-                                  <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 flex items-center gap-1">
-                                    <AlertTriangle className="w-3 h-3" />
-                                    Low stock
-                                  </span>
-                                )}
-                              </div>
-                              <TagBadges tags={item.tags} />
                             </div>
                           ))}
                         </div>
                       </div>
 
                       <div className="bg-yellow-50 p-4 rounded-lg">
-                        <div className="flex justify-between items-center mb-3">
-                          <h4 className="font-semibold text-yellow-900">Crunch & Sip</h4>
-                          <button
-                            onClick={() => swapItem('hazel', 'fruit', 'crunchAndSip')}
-                            className="text-yellow-600 hover:text-yellow-800 text-sm flex items-center gap-1"
-                          >
-                            <Shuffle className="w-3 h-3" />
-                            Swap
-                          </button>
-                        </div>
+                        <h4 className="font-semibold text-yellow-900 mb-3">Crunch & Sip</h4>
                         <div className="bg-white p-3 rounded border-l-2 border-yellow-400">
-                          <div className="font-medium">{todaysPlan.hazel.crunchAndSip.name}</div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <StarRating rating={todaysPlan.hazel.crunchAndSip.hazelRating} label="Rating" readOnly />
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="font-medium">{todaysPlan.hazel.crunchAndSip.name}</div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <StarRating rating={todaysPlan.hazel.crunchAndSip.hazelRating} label="Rating" readOnly />
+                              </div>
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                <PrepBadge prep={todaysPlan.hazel.crunchAndSip.prep} />
+                                <HealthBadge rating={todaysPlan.hazel.crunchAndSip.healthRating} />
+                              </div>
+                              <TagBadges tags={todaysPlan.hazel.crunchAndSip.tags} />
+                            </div>
+                            <button
+                              onClick={() => swapSingleItem('hazel', 'crunchAndSip')}
+                              className="text-yellow-600 hover:text-yellow-800 text-sm flex items-center gap-1 ml-2"
+                            >
+                              <Shuffle className="w-3 h-3" />
+                            </button>
                           </div>
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            <PrepBadge prep={todaysPlan.hazel.crunchAndSip.prep} />
-                            <HealthBadge rating={todaysPlan.hazel.crunchAndSip.healthRating} />
-                          </div>
-                          <TagBadges tags={todaysPlan.hazel.crunchAndSip.tags} />
                         </div>
                       </div>
 
@@ -851,6 +1323,9 @@ const LunchboxManager = () => {
                         <h4 className="font-semibold text-green-900 mb-3 flex items-center gap-2">
                           <Clock className="w-4 h-4" />
                           Lunch (10 min eating)
+                          <span className="text-xs bg-green-100 px-2 py-1 rounded-full">
+                            {todaysPlan.hazel.extras.length} extras
+                          </span>
                         </h4>
                         <div className="space-y-2">
                           <div className="bg-white p-3 rounded border-l-4 border-green-500">
@@ -868,7 +1343,7 @@ const LunchboxManager = () => {
                                 <TagBadges tags={todaysPlan.hazel.main.tags} />
                               </div>
                               <button
-                                onClick={() => swapItem('hazel', 'main', 'main')}
+                                onClick={() => swapSingleItem('hazel', 'main')}
                                 className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
                               >
                                 <Shuffle className="w-3 h-3" />
@@ -891,7 +1366,7 @@ const LunchboxManager = () => {
                                 <TagBadges tags={todaysPlan.hazel.veggie.tags} />
                               </div>
                               <button
-                                onClick={() => swapItem('hazel', 'veggie', 'veggie')}
+                                onClick={() => swapSingleItem('hazel', 'veggie')}
                                 className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
                               >
                                 <Shuffle className="w-3 h-3" />
@@ -915,7 +1390,7 @@ const LunchboxManager = () => {
                                   <TagBadges tags={item.tags} />
                                 </div>
                                 <button
-                                  onClick={() => swapItem('hazel', 'mixed', 'extras')}
+                                  onClick={() => swapSingleItem('hazel', 'extras', idx)}
                                   className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 ml-2"
                                 >
                                   <Shuffle className="w-3 h-3" />
@@ -1234,18 +1709,16 @@ const LunchboxManager = () => {
                         <div key={food.id} className="bg-gray-50 p-3 rounded-lg">
                           <div className="flex justify-between items-start mb-2">
                             <div className="flex-1">
-                              <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
                                 <h4 className="font-semibold text-lg text-gray-800">{food.name}</h4>
                                 {food.servings !== null && food.servings !== undefined && (
-                                  <div className="text-right">
-                                    <div className="text-sm font-medium text-gray-600">Stock:</div>
-                                    <div className={`text-lg font-bold ${
-                                      isRunningLow(food) ? 'text-red-600' : 
-                                      food.servings === 0 ? 'text-gray-400' : 'text-green-600'
-                                    }`}>
-                                      {food.servings} left
-                                    </div>
-                                  </div>
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    isRunningLow(food) ? 'bg-red-100 text-red-700' : 
+                                    food.servings === 0 ? 'bg-gray-100 text-gray-500' : 
+                                    food.servings > 10 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                  }`}>
+                                    {food.servings} {food.servings === 1 ? 'serving' : 'servings'}
+                                  </span>
                                 )}
                               </div>
                               {isRunningLow(food) && (
