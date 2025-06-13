@@ -123,7 +123,13 @@ const LunchboxManager = () => {
   };
 
   const updateFood = (updatedFood) => {
-    setFoods(foods.map(f => f.id === updatedFood.id ? updatedFood : f));
+    // If servings is set to 0, automatically archive the food
+    if (updatedFood.servings === 0) {
+      setFoods(foods.filter(f => f.id !== updatedFood.id));
+      setArchivedFoods([...archivedFoods, { ...updatedFood, available: false }]);
+    } else {
+      setFoods(foods.map(f => f.id === updatedFood.id ? updatedFood : f));
+    }
     setEditingFood(null);
   };
 
@@ -383,6 +389,19 @@ const LunchboxManager = () => {
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-medium mb-2">Stock/Servings</label>
+              <input
+                type="number"
+                placeholder="Servings available (leave empty for unlimited)"
+                value={editedFood.servings || ''}
+                onChange={(e) => setEditedFood({...editedFood, servings: e.target.value ? parseInt(e.target.value) : null})}
+                className="w-full p-2 border rounded-lg text-sm"
+                min="0"
+              />
+              <p className="text-xs text-gray-500 mt-1">Leave empty for unlimited stock (like fresh fruits). Set to 0 to mark as out of stock.</p>
+            </div>
+
             <div className="flex gap-2 pt-4">
               <button
                 onClick={() => onSave(editedFood)}
@@ -499,13 +518,6 @@ const LunchboxManager = () => {
             className={`px-6 py-3 font-medium whitespace-nowrap ${activeTab === 'tags' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
           >
             Manage Tags
-          </button>
-          <button
-            onClick={() => setActiveTab('archived')}
-            className={`px-6 py-3 font-medium whitespace-nowrap ${activeTab === 'archived' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-          >
-            <Archive className="w-4 h-4 inline mr-2" />
-            Out of Stock ({archivedFoods.length})
           </button>
         </div>
 
@@ -1075,6 +1087,66 @@ const LunchboxManager = () => {
                   </div>
                 ))}
               </div>
+
+              {/* Out of Stock Section */}
+              {archivedFoods.length > 0 && (
+                <div className="mt-8">
+                  <h3 className="text-lg font-semibold mb-4 text-gray-700">Out of Stock Foods</h3>
+                  <div className="space-y-4">
+                    {['snack', 'fruit', 'main', 'veggie'].map(category => {
+                      const categoryFoods = archivedFoods.filter(f => f.category === category);
+                      if (categoryFoods.length === 0) return null;
+                      
+                      return (
+                        <div key={category} className="border rounded-lg p-4 bg-gray-50">
+                          <h4 className="font-medium mb-3 capitalize text-gray-600">
+                            {category === 'snack' ? 'Snacks & Sides' : category} (Out of Stock)
+                          </h4>
+                          <div className="grid gap-3">
+                            {categoryFoods.map(food => (
+                              <div key={food.id} className="bg-white p-3 rounded-lg border border-gray-200">
+                                <div className="flex justify-between items-start mb-2">
+                                  <h5 className="font-medium text-gray-700">{food.name}</h5>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => restoreFood(food.id)}
+                                      className="text-green-500 hover:text-green-700"
+                                      title="Mark as back in stock"
+                                    >
+                                      <RotateCcw className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => deleteFood(food.id, true)}
+                                      className="text-red-500 hover:text-red-700"
+                                      title="Delete permanently"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="grid md:grid-cols-2 gap-4">
+                                  <div className="space-y-1">
+                                    <StarRating rating={food.ameliaRating} label="Amelia" readOnly />
+                                    <StarRating rating={food.hazelRating} label="Hazel" readOnly />
+                                    <StarRating rating={food.healthRating} label="Health" readOnly />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <div className="flex flex-wrap gap-1">
+                                      <PrepBadge prep={food.prep} />
+                                      <HealthBadge rating={food.healthRating} />
+                                    </div>
+                                    <TagBadges tags={food.tags} />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1123,72 +1195,6 @@ const LunchboxManager = () => {
                   ))}
                 </div>
               </div>
-            </div>
-          )}
-
-          {activeTab === 'archived' && (
-            <div>
-              <h2 className="text-xl font-semibold mb-6">Out of Stock Foods</h2>
-              {archivedFoods.length > 0 ? (
-                <div className="space-y-6">
-                  {['snack', 'fruit', 'main', 'veggie'].map(category => {
-                    const categoryFoods = archivedFoods.filter(f => f.category === category);
-                    if (categoryFoods.length === 0) return null;
-                    
-                    return (
-                      <div key={category} className="border rounded-lg p-4 bg-gray-50">
-                        <h3 className="font-medium mb-3 capitalize text-gray-600">
-                          {category === 'snack' ? 'Snacks & Sides' : category} (Out of Stock)
-                        </h3>
-                        <div className="grid gap-3">
-                          {categoryFoods.map(food => (
-                            <div key={food.id} className="bg-white p-3 rounded-lg border border-gray-200">
-                              <div className="flex justify-between items-start mb-2">
-                                <h4 className="font-medium text-gray-700">{food.name}</h4>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => restoreFood(food.id)}
-                                    className="text-green-500 hover:text-green-700"
-                                    title="Mark as back in stock"
-                                  >
-                                    <RotateCcw className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => deleteFood(food.id, true)}
-                                    className="text-red-500 hover:text-red-700"
-                                    title="Delete permanently"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="grid md:grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                  <StarRating rating={food.ameliaRating} label="Amelia" readOnly />
-                                  <StarRating rating={food.hazelRating} label="Hazel" readOnly />
-                                  <StarRating rating={food.healthRating} label="Health" readOnly />
-                                </div>
-                                <div className="space-y-2">
-                                  <div className="flex flex-wrap gap-1">
-                                    <PrepBadge prep={food.prep} />
-                                    <HealthBadge rating={food.healthRating} />
-                                  </div>
-                                  <TagBadges tags={food.tags} />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Archive className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                  <p className="text-gray-500">No foods are currently out of stock</p>
-                </div>
-              )}
             </div>
           )}
         </div>
