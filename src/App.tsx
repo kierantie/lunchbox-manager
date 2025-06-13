@@ -864,7 +864,7 @@ const LunchboxManager = () => {
     
     // Get foods already used in this child's plan to avoid duplicates
     const usedFoodIds = new Set();
-    ['main', 'recess', 'extras', 'crunchSip'].forEach(sec => {
+    ['main', 'recess', 'extras', 'crunchSip', 'veggie'].forEach(sec => {
       if (childPlan[sec]) {
         childPlan[sec].forEach(item => usedFoodIds.add(item.id));
       }
@@ -886,6 +886,9 @@ const LunchboxManager = () => {
         break;
       case 'crunchSip':
         availableFoods = [...fruits, ...veggies].filter(f => !usedFoodIds.has(f.id));
+        break;
+      case 'veggie':
+        availableFoods = veggies.filter(f => !usedFoodIds.has(f.id));
         break;
     }
     
@@ -1036,9 +1039,9 @@ const LunchboxManager = () => {
     // Get all currently used items to avoid duplicates
     const allCurrentItems = [
       ...(Array.isArray(updatedPlan[child].recess) ? updatedPlan[child].recess : []),
-      updatedPlan[child].crunchAndSip,
-      updatedPlan[child].main,
-      updatedPlan[child].veggie,
+      ...(Array.isArray(updatedPlan[child].crunchSip) ? updatedPlan[child].crunchSip : []),
+      ...(Array.isArray(updatedPlan[child].main) ? updatedPlan[child].main : []),
+      ...(Array.isArray(updatedPlan[child].veggie) ? updatedPlan[child].veggie : []),
       ...(Array.isArray(updatedPlan[child].extras) ? updatedPlan[child].extras : [])
     ].filter(Boolean);
     
@@ -1048,15 +1051,17 @@ const LunchboxManager = () => {
     let currentItem = null;
     
     // Determine what we're swapping and get available alternatives
-    if (slot === 'main') {
+    if (slot === 'main' && itemIndex !== null) {
       availableItems = getFilteredFoods(foods.filter(f => f.category === 'main'), child);
-      currentItem = updatedPlan[child].main;
-    } else if (slot === 'veggie') {
+      currentItem = updatedPlan[child].main[itemIndex];
+    } else if (slot === 'veggie' && itemIndex !== null) {
       availableItems = getFilteredFoods(foods.filter(f => f.category === 'veggie'), child);
-      currentItem = updatedPlan[child].veggie;
-    } else if (slot === 'crunchAndSip') {
-      availableItems = getFilteredFoods(foods.filter(f => f.category === 'fruit'), child);
-      currentItem = updatedPlan[child].crunchAndSip;
+      currentItem = updatedPlan[child].veggie[itemIndex];
+    } else if (slot === 'crunchSip' && itemIndex !== null) {
+      const fruits = foods.filter(f => f.category === 'fruit');
+      const veggies = foods.filter(f => f.category === 'veggie');
+      availableItems = getFilteredFoods([...fruits, ...veggies], child);
+      currentItem = updatedPlan[child].crunchSip[itemIndex];
     } else if (slot === 'recess' && itemIndex !== null) {
       const snacks = foods.filter(f => f.category === 'snack');
       const fruits = foods.filter(f => f.category === 'fruit');
@@ -1083,8 +1088,8 @@ const LunchboxManager = () => {
     if (!newItem) return;
     
     // Update the specific item
-    if (slot === 'main' || slot === 'veggie' || slot === 'crunchAndSip') {
-      updatedPlan[child][slot] = newItem;
+    if (slot === 'main' || slot === 'veggie' || slot === 'crunchSip') {
+      updatedPlan[child][slot][itemIndex] = newItem;
       
       // If main changed, recalculate dynamic quantities
       if (slot === 'main') {
@@ -1630,7 +1635,7 @@ const LunchboxManager = () => {
                           <div className="flex items-center gap-1 ml-auto">
                             <button
                               onClick={() => addSlot('amelia', 'recess')}
-                              className="w-6 h-6 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
+                              className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 flex items-center justify-center text-xs font-bold"
                               title="Add recess item"
                             >
                               +
@@ -1713,7 +1718,7 @@ const LunchboxManager = () => {
                           <div className="flex items-center gap-1 ml-auto">
                             <button
                               onClick={() => addSlot('amelia', 'crunchSip')}
-                              className="w-6 h-6 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
+                              className="w-6 h-6 rounded-full bg-yellow-100 text-yellow-600 hover:bg-yellow-200 flex items-center justify-center text-xs font-bold"
                               title="Add crunch & sip item"
                             >
                               +
@@ -2027,7 +2032,7 @@ const LunchboxManager = () => {
                           <div className="flex items-center gap-1 ml-auto">
                             <button
                               onClick={() => addSlot('hazel', 'recess')}
-                              className="w-6 h-6 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
+                              className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 flex items-center justify-center text-xs font-bold"
                               title="Add recess item"
                             >
                               +
@@ -2110,7 +2115,7 @@ const LunchboxManager = () => {
                           <div className="flex items-center gap-1 ml-auto">
                             <button
                               onClick={() => addSlot('hazel', 'crunchSip')}
-                              className="w-6 h-6 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
+                              className="w-6 h-6 rounded-full bg-yellow-100 text-yellow-600 hover:bg-yellow-200 flex items-center justify-center text-xs font-bold"
                               title="Add crunch & sip item"
                             >
                               +
