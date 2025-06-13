@@ -38,7 +38,8 @@ const LunchboxManager = () => {
       main: 1,                // Default main items per lunch
       recess: 2,              // Default recess items per lunch  
       extras: 2,              // Default extra items per lunch
-      crunchSip: 1            // Default crunch & sip items per lunch
+      crunchSip: 1,           // Default crunch & sip items per lunch
+      veggie: 1               // Default veggie items per lunch
     }
   });
   const [newFood, setNewFood] = useState({
@@ -289,7 +290,8 @@ const LunchboxManager = () => {
             main: 1,
             recess: 2,
             extras: 2,
-            crunchSip: 1
+            crunchSip: 1,
+            veggie: 1
           }
         });
         
@@ -526,17 +528,14 @@ const LunchboxManager = () => {
     return selected;
   };
 
-  // Helper function to calculate dynamic quantities based on main dish rating and settings
-  const getDynamicQuantities = (mainRating) => {
-    // Use default slot counts from settings, but adjust based on main rating
-    const baseRecess = appSettings.defaultSlots.recess;
-    const baseExtras = appSettings.defaultSlots.extras;
-    
+  // Helper function to get static quantities from settings (no dynamic adjustment)
+  const getStaticQuantities = () => {
     return {
       mainCount: appSettings.defaultSlots.main,
-      recessCount: mainRating >= 4 ? Math.max(1, baseRecess - 1) : baseRecess,
-      extrasCount: mainRating >= 4 ? Math.max(1, baseExtras - 1) : baseExtras,
-      crunchSipCount: appSettings.defaultSlots.crunchSip
+      recessCount: appSettings.defaultSlots.recess,
+      extrasCount: appSettings.defaultSlots.extras,
+      crunchSipCount: appSettings.defaultSlots.crunchSip,
+      veggieCount: appSettings.defaultSlots.veggie || 1
     };
   };
 
@@ -722,7 +721,7 @@ const LunchboxManager = () => {
       const selectedMain = selectRandomPreferredItems(mains, 1, child)[0];
       const mainRating = selectedMain ? (child === 'amelia' ? selectedMain.ameliaRating : selectedMain.hazelRating) : 3;
       
-      const { mainCount, recessCount, extrasCount, crunchSipCount } = getDynamicQuantities(mainRating);
+      const { mainCount, recessCount, extrasCount, crunchSipCount, veggieCount } = getStaticQuantities();
       
       const recessFoods = [...snacks, ...fruits]; // Recess can have snacks and fruits
       const lunchExtrasFoods = [...snacks, ...fruits]; // Lunch extras can include fruits for variety
@@ -735,8 +734,8 @@ const LunchboxManager = () => {
       const crunchSipItems = selectRandomPreferredItems(crunchSipFoods, crunchSipCount, child, [...usedTags]);
       crunchSipItems.forEach(item => usedTags.push(...item.tags));
       
-      const veggieItem = selectRandomPreferredItems(veggies, 1, child, [...usedTags])[0];
-      if (veggieItem) usedTags.push(...veggieItem.tags);
+      const veggieItems = selectRandomPreferredItems(veggies, veggieCount, child, [...usedTags]);
+      veggieItems.forEach(item => usedTags.push(...item.tags));
       
       let extrasItems = selectRandomPreferredItems(lunchExtrasFoods, extrasCount, child, [...usedTags]);
       
@@ -752,7 +751,7 @@ const LunchboxManager = () => {
         recess: recessItems,
         crunchSip: crunchSipItems,
         main: selectedMain ? [selectedMain] : [],
-        veggie: veggieItem ? [veggieItem] : [],
+        veggie: veggieItems,
         extras: extrasItems
       };
     };
@@ -805,7 +804,7 @@ const LunchboxManager = () => {
       const mainRating = selectedMain ? (child === 'amelia' ? selectedMain.ameliaRating : selectedMain.hazelRating) : 3;
       
       // Determine quantities based on main rating
-      const { mainCount, recessCount, extrasCount, crunchSipCount } = getDynamicQuantities(mainRating);
+      const { mainCount, recessCount, extrasCount, crunchSipCount, veggieCount } = getStaticQuantities();
       
       const recessFoods = [...snacks, ...fruits]; // Recess can have snacks and fruits
       const lunchExtrasFoods = [...snacks, ...fruits]; // Lunch extras can include fruits for variety
@@ -819,8 +818,8 @@ const LunchboxManager = () => {
       const crunchSipItems = selectPreferredItemsWithHistory(crunchSipFoods, crunchSipCount, child, [...usedTags]);
       crunchSipItems.forEach(item => usedTags.push(...item.tags));
       
-      const veggieItem = selectPreferredItemsWithHistory(veggies, 1, child, [...usedTags])[0];
-      if (veggieItem) usedTags.push(...veggieItem.tags);
+      const veggieItems = selectPreferredItemsWithHistory(veggies, veggieCount, child, [...usedTags]);
+      veggieItems.forEach(item => usedTags.push(...item.tags));
       
       let extrasItems = selectPreferredItemsWithHistory(lunchExtrasFoods, extrasCount, child, [...usedTags]);
       
@@ -837,7 +836,7 @@ const LunchboxManager = () => {
         recess: recessItems,
         crunchSip: crunchSipItems,
         main: selectedMain ? [selectedMain] : [],
-        veggie: veggieItem ? [veggieItem] : [],
+        veggie: veggieItems,
         extras: extrasItems
       };
     };
@@ -852,88 +851,6 @@ const LunchboxManager = () => {
     showMotivationalMessage('plan_generated');
   };
 
-  // Add a new slot to a specific section of a child's plan
-  const addSlot = (child, section) => {
-    if (!todaysPlan) return;
-    
-    const childPlan = todaysPlan[child];
-    const snacks = getChildFoods('snack', child);
-    const fruits = getChildFoods('fruit', child);
-    const mains = getChildFoods('main', child);
-    const veggies = getChildFoods('veggie', child);
-    
-    // Get foods already used in this child's plan to avoid duplicates
-    const usedFoodIds = new Set();
-    ['main', 'recess', 'extras', 'crunchSip', 'veggie'].forEach(sec => {
-      if (childPlan[sec]) {
-        childPlan[sec].forEach(item => usedFoodIds.add(item.id));
-      }
-    });
-    
-    let newItem = null;
-    let availableFoods = [];
-    
-    // Determine what type of food to add based on section
-    switch (section) {
-      case 'main':
-        availableFoods = mains.filter(f => !usedFoodIds.has(f.id));
-        break;
-      case 'recess':
-        availableFoods = [...snacks, ...fruits].filter(f => !usedFoodIds.has(f.id));
-        break;
-      case 'extras':
-        availableFoods = [...snacks, ...fruits].filter(f => !usedFoodIds.has(f.id));
-        break;
-      case 'crunchSip':
-        availableFoods = [...fruits, ...veggies].filter(f => !usedFoodIds.has(f.id));
-        break;
-      case 'veggie':
-        availableFoods = veggies.filter(f => !usedFoodIds.has(f.id));
-        break;
-    }
-    
-    // Select a new item using the same logic as plan generation
-    if (availableFoods.length > 0) {
-      const recentlyUsedFoods = getRecentlyUsedFoods(child, 2);
-      const availableNonRecent = availableFoods.filter(f => !recentlyUsedFoods.has(f.id));
-      const foodsToChooseFrom = availableNonRecent.length > 0 ? availableNonRecent : availableFoods;
-      
-      newItem = selectPreferredItemsWithHistory(foodsToChooseFrom, 1, child)[0];
-    }
-    
-    if (newItem) {
-      const updatedPlan = {
-        ...todaysPlan,
-        [child]: {
-          ...childPlan,
-          [section]: [...(childPlan[section] || []), newItem]
-        }
-      };
-      setTodaysPlan(updatedPlan);
-      showMotivationalMessage('slot_added');
-    }
-  };
-
-  // Remove a slot from a specific section of a child's plan
-  const removeSlot = (child, section, index) => {
-    if (!todaysPlan) return;
-    
-    const childPlan = todaysPlan[child];
-    const sectionItems = [...(childPlan[section] || [])];
-    
-    // Remove the item at the specified index
-    sectionItems.splice(index, 1);
-    
-    const updatedPlan = {
-      ...todaysPlan,
-      [child]: {
-        ...childPlan,
-        [section]: sectionItems
-      }
-    };
-    
-    setTodaysPlan(updatedPlan);
-  };
 
   const addFood = () => {
     if (newFood.name.trim()) {
@@ -1090,41 +1007,6 @@ const LunchboxManager = () => {
     // Update the specific item
     if (slot === 'main' || slot === 'veggie' || slot === 'crunchSip') {
       updatedPlan[child][slot][itemIndex] = newItem;
-      
-      // If main changed, recalculate dynamic quantities
-      if (slot === 'main') {
-        const newMainRating = child === 'amelia' ? newItem.ameliaRating : newItem.hazelRating;
-        const { recessCount, extrasCount } = getDynamicQuantities(newMainRating);
-        
-        // Adjust arrays if needed
-        if (updatedPlan[child].recess.length !== recessCount) {
-          if (recessCount > updatedPlan[child].recess.length) {
-            // Add more items
-            const snacks = foods.filter(f => f.category === 'snack');
-            const fruits = foods.filter(f => f.category === 'fruit');
-            const mixedFoods = getFilteredFoods([...snacks, ...fruits], child);
-            const moreItems = selectPreferredItems(mixedFoods, recessCount - updatedPlan[child].recess.length, child, []);
-            updatedPlan[child].recess = [...updatedPlan[child].recess, ...moreItems];
-          } else {
-            // Remove items
-            updatedPlan[child].recess = updatedPlan[child].recess.slice(0, recessCount);
-          }
-        }
-        
-        if (updatedPlan[child].extras.length !== extrasCount) {
-          if (extrasCount > updatedPlan[child].extras.length) {
-            // Add more items
-            const snacks = foods.filter(f => f.category === 'snack');
-            const fruits = foods.filter(f => f.category === 'fruit');
-            const mixedFoods = getFilteredFoods([...snacks, ...fruits], child);
-            const moreItems = selectPreferredItems(mixedFoods, extrasCount - updatedPlan[child].extras.length, child, []);
-            updatedPlan[child].extras = [...updatedPlan[child].extras, ...moreItems];
-          } else {
-            // Remove items
-            updatedPlan[child].extras = updatedPlan[child].extras.slice(0, extrasCount);
-          }
-        }
-      }
     } else if (slot === 'recess' && itemIndex !== null) {
       const newRecess = [...updatedPlan[child].recess];
       newRecess[itemIndex] = newItem;
@@ -1632,24 +1514,6 @@ const LunchboxManager = () => {
                           <span className="text-xs bg-blue-100 px-2 py-1 rounded-full">
                             {todaysPlan.amelia.recess.length} items
                           </span>
-                          <div className="flex items-center gap-1 ml-auto">
-                            <button
-                              onClick={() => addSlot('amelia', 'recess')}
-                              className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 flex items-center justify-center text-xs font-bold"
-                              title="Add recess item"
-                            >
-                              +
-                            </button>
-                            {todaysPlan.amelia.recess.length > 1 && (
-                              <button
-                                onClick={() => removeSlot('amelia', 'recess', todaysPlan.amelia.recess.length - 1)}
-                                className="w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
-                                title="Remove last recess item"
-                              >
-                                −
-                              </button>
-                            )}
-                          </div>
                         </h4>
                         <div className="space-y-2">
                           {todaysPlan.amelia.recess.map((item, idx) => (
@@ -1693,15 +1557,6 @@ const LunchboxManager = () => {
                                   >
                                     <Shuffle className="w-3 h-3" />
                                   </button>
-                                  {todaysPlan.amelia.recess.length > 1 && (
-                                    <button
-                                      onClick={() => removeSlot('amelia', 'recess', idx)}
-                                      className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
-                                      title="Remove this item"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1715,24 +1570,6 @@ const LunchboxManager = () => {
                           <span className="text-xs bg-yellow-100 px-2 py-1 rounded-full">
                             {todaysPlan.amelia.crunchSip.length} items
                           </span>
-                          <div className="flex items-center gap-1 ml-auto">
-                            <button
-                              onClick={() => addSlot('amelia', 'crunchSip')}
-                              className="w-6 h-6 rounded-full bg-yellow-100 text-yellow-600 hover:bg-yellow-200 flex items-center justify-center text-xs font-bold"
-                              title="Add crunch & sip item"
-                            >
-                              +
-                            </button>
-                            {todaysPlan.amelia.crunchSip.length > 1 && (
-                              <button
-                                onClick={() => removeSlot('amelia', 'crunchSip', todaysPlan.amelia.crunchSip.length - 1)}
-                                className="w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
-                                title="Remove last crunch & sip item"
-                              >
-                                −
-                              </button>
-                            )}
-                          </div>
                         </h4>
                         <div className="space-y-2">
                           {todaysPlan.amelia.crunchSip.map((item, idx) => (
@@ -1776,15 +1613,6 @@ const LunchboxManager = () => {
                                   >
                                     <Shuffle className="w-3 h-3" />
                                   </button>
-                                  {todaysPlan.amelia.crunchSip.length > 1 && (
-                                    <button
-                                      onClick={() => removeSlot('amelia', 'crunchSip', idx)}
-                                      className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
-                                      title="Remove this item"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1799,24 +1627,6 @@ const LunchboxManager = () => {
                           <span className="text-xs bg-green-100 px-2 py-1 rounded-full">
                             {todaysPlan.amelia.extras.length} extras
                           </span>
-                          <div className="flex items-center gap-1 ml-auto">
-                            <button
-                              onClick={() => addSlot('amelia', 'extras')}
-                              className="w-6 h-6 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
-                              title="Add extra item"
-                            >
-                              +
-                            </button>
-                            {todaysPlan.amelia.extras.length > 1 && (
-                              <button
-                                onClick={() => removeSlot('amelia', 'extras', todaysPlan.amelia.extras.length - 1)}
-                                className="w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
-                                title="Remove last extra item"
-                              >
-                                −
-                              </button>
-                            )}
-                          </div>
                         </h4>
                         <div className="space-y-2">
                           {todaysPlan.amelia.main.map((item, idx) => (
@@ -1826,22 +1636,6 @@ const LunchboxManager = () => {
                                   <div className="flex items-center gap-2">
                                     <div className="text-xs font-medium text-green-700 uppercase">Main</div>
                                     <div className="flex items-center gap-1">
-                                      <button
-                                        onClick={() => addSlot('amelia', 'main')}
-                                        className="w-4 h-4 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
-                                        title="Add main item"
-                                      >
-                                        +
-                                      </button>
-                                      {todaysPlan.amelia.main.length > 1 && (
-                                        <button
-                                          onClick={() => removeSlot('amelia', 'main', idx)}
-                                          className="w-4 h-4 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
-                                          title="Remove this main item"
-                                        >
-                                          −
-                                        </button>
-                                      )}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -1891,22 +1685,6 @@ const LunchboxManager = () => {
                                   <div className="flex items-center gap-2">
                                     <div className="text-xs font-medium text-green-700 uppercase">Veggie</div>
                                     <div className="flex items-center gap-1">
-                                      <button
-                                        onClick={() => addSlot('amelia', 'veggie')}
-                                        className="w-4 h-4 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
-                                        title="Add veggie item"
-                                      >
-                                        +
-                                      </button>
-                                      {todaysPlan.amelia.veggie.length > 1 && (
-                                        <button
-                                          onClick={() => removeSlot('amelia', 'veggie', idx)}
-                                          className="w-4 h-4 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
-                                          title="Remove this veggie item"
-                                        >
-                                          −
-                                        </button>
-                                      )}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -1991,15 +1769,6 @@ const LunchboxManager = () => {
                                   >
                                     <Shuffle className="w-3 h-3" />
                                   </button>
-                                  {todaysPlan.amelia.extras.length > 1 && (
-                                    <button
-                                      onClick={() => removeSlot('amelia', 'extras', idx)}
-                                      className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
-                                      title="Remove this item"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  )}
                                 </div>
                               </div>
                             </div>
@@ -2029,24 +1798,6 @@ const LunchboxManager = () => {
                           <span className="text-xs bg-blue-100 px-2 py-1 rounded-full">
                             {todaysPlan.hazel.recess.length} items
                           </span>
-                          <div className="flex items-center gap-1 ml-auto">
-                            <button
-                              onClick={() => addSlot('hazel', 'recess')}
-                              className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 flex items-center justify-center text-xs font-bold"
-                              title="Add recess item"
-                            >
-                              +
-                            </button>
-                            {todaysPlan.hazel.recess.length > 1 && (
-                              <button
-                                onClick={() => removeSlot('hazel', 'recess', todaysPlan.hazel.recess.length - 1)}
-                                className="w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
-                                title="Remove last recess item"
-                              >
-                                −
-                              </button>
-                            )}
-                          </div>
                         </h4>
                         <div className="space-y-2">
                           {todaysPlan.hazel.recess.map((item, idx) => (
@@ -2090,15 +1841,6 @@ const LunchboxManager = () => {
                                   >
                                     <Shuffle className="w-3 h-3" />
                                   </button>
-                                  {todaysPlan.hazel.recess.length > 1 && (
-                                    <button
-                                      onClick={() => removeSlot('hazel', 'recess', idx)}
-                                      className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
-                                      title="Remove this item"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  )}
                                 </div>
                               </div>
                             </div>
@@ -2112,24 +1854,6 @@ const LunchboxManager = () => {
                           <span className="text-xs bg-yellow-100 px-2 py-1 rounded-full">
                             {todaysPlan.hazel.crunchSip.length} items
                           </span>
-                          <div className="flex items-center gap-1 ml-auto">
-                            <button
-                              onClick={() => addSlot('hazel', 'crunchSip')}
-                              className="w-6 h-6 rounded-full bg-yellow-100 text-yellow-600 hover:bg-yellow-200 flex items-center justify-center text-xs font-bold"
-                              title="Add crunch & sip item"
-                            >
-                              +
-                            </button>
-                            {todaysPlan.hazel.crunchSip.length > 1 && (
-                              <button
-                                onClick={() => removeSlot('hazel', 'crunchSip', todaysPlan.hazel.crunchSip.length - 1)}
-                                className="w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
-                                title="Remove last crunch & sip item"
-                              >
-                                −
-                              </button>
-                            )}
-                          </div>
                         </h4>
                         <div className="space-y-2">
                           {todaysPlan.hazel.crunchSip.map((item, idx) => (
@@ -2173,15 +1897,6 @@ const LunchboxManager = () => {
                                   >
                                     <Shuffle className="w-3 h-3" />
                                   </button>
-                                  {todaysPlan.hazel.crunchSip.length > 1 && (
-                                    <button
-                                      onClick={() => removeSlot('hazel', 'crunchSip', idx)}
-                                      className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
-                                      title="Remove this item"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  )}
                                 </div>
                               </div>
                             </div>
@@ -2196,24 +1911,6 @@ const LunchboxManager = () => {
                           <span className="text-xs bg-green-100 px-2 py-1 rounded-full">
                             {todaysPlan.hazel.extras.length} extras
                           </span>
-                          <div className="flex items-center gap-1 ml-auto">
-                            <button
-                              onClick={() => addSlot('hazel', 'extras')}
-                              className="w-6 h-6 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
-                              title="Add extra item"
-                            >
-                              +
-                            </button>
-                            {todaysPlan.hazel.extras.length > 1 && (
-                              <button
-                                onClick={() => removeSlot('hazel', 'extras', todaysPlan.hazel.extras.length - 1)}
-                                className="w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
-                                title="Remove last extra item"
-                              >
-                                −
-                              </button>
-                            )}
-                          </div>
                         </h4>
                         <div className="space-y-2">
                           {todaysPlan.hazel.main.map((item, idx) => (
@@ -2223,22 +1920,6 @@ const LunchboxManager = () => {
                                   <div className="flex items-center gap-2">
                                     <div className="text-xs font-medium text-green-700 uppercase">Main</div>
                                     <div className="flex items-center gap-1">
-                                      <button
-                                        onClick={() => addSlot('hazel', 'main')}
-                                        className="w-4 h-4 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
-                                        title="Add main item"
-                                      >
-                                        +
-                                      </button>
-                                      {todaysPlan.hazel.main.length > 1 && (
-                                        <button
-                                          onClick={() => removeSlot('hazel', 'main', idx)}
-                                          className="w-4 h-4 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
-                                          title="Remove this main item"
-                                        >
-                                          −
-                                        </button>
-                                      )}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -2288,22 +1969,6 @@ const LunchboxManager = () => {
                                   <div className="flex items-center gap-2">
                                     <div className="text-xs font-medium text-green-700 uppercase">Veggie</div>
                                     <div className="flex items-center gap-1">
-                                      <button
-                                        onClick={() => addSlot('hazel', 'veggie')}
-                                        className="w-4 h-4 rounded-full bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center text-xs font-bold"
-                                        title="Add veggie item"
-                                      >
-                                        +
-                                      </button>
-                                      {todaysPlan.hazel.veggie.length > 1 && (
-                                        <button
-                                          onClick={() => removeSlot('hazel', 'veggie', idx)}
-                                          className="w-4 h-4 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center text-xs font-bold"
-                                          title="Remove this veggie item"
-                                        >
-                                          −
-                                        </button>
-                                      )}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -2388,15 +2053,6 @@ const LunchboxManager = () => {
                                   >
                                     <Shuffle className="w-3 h-3" />
                                   </button>
-                                  {todaysPlan.hazel.extras.length > 1 && (
-                                    <button
-                                      onClick={() => removeSlot('hazel', 'extras', idx)}
-                                      className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
-                                      title="Remove this item"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  )}
                                 </div>
                               </div>
                             </div>
@@ -3343,7 +2999,7 @@ const LunchboxManager = () => {
                     
                     <div className="border-t pt-4 mt-4">
                       <h4 className="text-sm font-semibold text-gray-700 mb-3">Default Lunch Plan Slots</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Main Items: {appSettings.defaultSlots.main}
@@ -3423,6 +3079,26 @@ const LunchboxManager = () => {
                             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                           />
                         </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Veggie Items: {appSettings.defaultSlots.veggie || 1}
+                          </label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="3"
+                            value={appSettings.defaultSlots.veggie || 1}
+                            onChange={(e) => setAppSettings({
+                              ...appSettings,
+                              defaultSlots: {
+                                ...appSettings.defaultSlots,
+                                veggie: parseInt(e.target.value)
+                              }
+                            })}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
                       </div>
                       <p className="text-xs text-gray-500 mt-2">These control how many item slots new lunch plans will have by default</p>
                     </div>
@@ -3438,7 +3114,8 @@ const LunchboxManager = () => {
                           main: 1,
                           recess: 2,
                           extras: 2,
-                          crunchSip: 1
+                          crunchSip: 1,
+                          veggie: 1
                         }
                       })}
                       className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 text-sm"
