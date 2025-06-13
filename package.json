@@ -1,6 +1,6 @@
 {
   "name": "lunchbox-manager",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "ADHD-friendly lunch planning app for children",
   "type": "module",
   "scripts": {

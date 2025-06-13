@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, RefreshCw, Calendar, Clock, CheckCircle, Archive, RotateCcw, Star, Edit, X, Shuffle, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, Calendar, Clock, CheckCircle, Archive, RotateCcw, Star, Edit, X, Shuffle, AlertTriangle, HelpCircle, Settings, Download, Upload } from 'lucide-react';
 
 const LunchboxManager = () => {
   const [foods, setFoods] = useState([]);
@@ -9,12 +9,32 @@ const LunchboxManager = () => {
   const [planDate, setPlanDate] = useState('today');
   const [activeTab, setActiveTab] = useState('plan');
   const [editingFood, setEditingFood] = useState(null);
-  const [availableTags, setAvailableTags] = useState(['fruity', 'savoury', 'crunchy', 'chewy', 'soft', 'treat']);
+  const [availableTags, setAvailableTags] = useState(['🍓 fruity', '🧀 savoury', '🥨 crunchy', '🍬 chewy', '🍞 soft', '🍪 treat', '🍴 needs-cutlery']);
   const [newTag, setNewTag] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [confirmDeleteTag, setConfirmDeleteTag] = useState(null);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [showPackedConfirmation, setShowPackedConfirmation] = useState(false);
+  const [motivationalMessage, setMotivationalMessage] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState({
+    ameliaRating: 0,    // 0 = any rating, 1-5 = specific rating
+    hazelRating: 0,     // 0 = any rating, 1-5 = specific rating  
+    healthRating: 0,    // 0 = any rating, 1-5 = specific rating
+    category: 'all'     // 'all' or specific category
+  });
+  const [smartPlanningWeights, setSmartPlanningWeights] = useState({
+    preferenceWeight: 70,     // How much kid preference matters (0-100)
+    varietyWeight: 20,        // How much variety/avoiding recent foods matters (0-100) 
+    frequencyWeight: 10       // How much usage frequency matters (0-100)
+  });
+  const [appSettings, setAppSettings] = useState({
+    maxHistoryDays: 90,       // Maximum days of lunch history to keep
+    autoArchiveThreshold: 60, // Days without use before suggesting archive
+    defaultServings: 1,       // Default servings when adding new food
+    showUsageInPlanning: true,// Show usage frequency in planning view
+    compactMode: false        // Use compact display mode
+  });
   const [newFood, setNewFood] = useState({
     name: '',
     category: 'snack', 
@@ -27,28 +47,335 @@ const LunchboxManager = () => {
     servings: null
   });
 
+  // Motivational messages for immediate gratification
+  const motivationalMessages = [
+    { text: "🎉 Lunch planning pro!", emoji: "🌟" },
+    { text: "✨ Another nutritious day ahead!", emoji: "🥗" }, 
+    { text: "🚀 Lunchbox hero strikes again!", emoji: "💪" },
+    { text: "🎯 Nailed that lunch plan!", emoji: "👏" },
+    { text: "🏆 Master of meal prep!", emoji: "🏅" },
+    { text: "⭐ Kids will love this!", emoji: "😋" },
+    { text: "🌈 Variety is the spice of lunch!", emoji: "🎨" },
+    { text: "🎪 Fun lunch adventure awaits!", emoji: "🎭" },
+    { text: "🥇 Parent of the year!", emoji: "👑" },
+    { text: "🎁 Lunchbox magic created!", emoji: "✨" }
+  ];
+
+  const showMotivationalMessage = (trigger = 'general') => {
+    const randomMessage = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)];
+    setMotivationalMessage(randomMessage);
+    setTimeout(() => setMotivationalMessage(null), 3000); // Hide after 3 seconds
+  };
+
+  // Filter foods based on search query and rating filters
+  const filterFoodsBySearch = (foodList) => {
+    let filtered = foodList;
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(food => 
+        food.name.toLowerCase().includes(query) ||
+        food.category.toLowerCase().includes(query) ||
+        food.tags.some(tag => tag.toLowerCase().includes(query))
+      );
+    }
+    
+    // Apply rating filters
+    if (filters.ameliaRating > 0) {
+      filtered = filtered.filter(food => food.ameliaRating === filters.ameliaRating);
+    }
+    
+    if (filters.hazelRating > 0) {
+      filtered = filtered.filter(food => food.hazelRating === filters.hazelRating);
+    }
+    
+    if (filters.healthRating > 0) {
+      filtered = filtered.filter(food => food.healthRating === filters.healthRating);
+    }
+    
+    return filtered;
+  };
+
+  // Calculate usage frequency for a food in the last 2 weeks
+  const getFoodUsageFrequency = (foodId) => {
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+    
+    let count = 0;
+    lunchHistory.forEach(entry => {
+      const entryDate = new Date(entry.date);
+      if (entryDate >= twoWeeksAgo) {
+        // Check both kids' lunches
+        [...(entry.amelia || []), ...(entry.hazel || [])].forEach(item => {
+          if (item.id === foodId) {
+            count++;
+          }
+        });
+      }
+    });
+    
+    return count;
+  };
+
+  // Export all app data as JSON
+  const exportData = () => {
+    const exportData = {
+      foods,
+      archivedFoods,
+      lunchHistory,
+      availableTags,
+      smartPlanningWeights,
+      appSettings,
+      filters, // Include current filter settings
+      exportDate: new Date().toISOString(),
+      appVersion: "1.1.0", // From package.json
+      dataFormatVersion: "1.1" // For backwards compatibility checking
+    };
+    
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `lunchbox-manager-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    showMotivationalMessage('data_exported');
+  };
+
+  // Import data from JSON file
+  const importData = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Check file type
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      alert("❌ Error: Please select a valid JSON file");
+      event.target.value = '';
+      return;
+    }
+    
+    // Check file size (limit to 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert("❌ Error: File is too large (max 10MB)");
+      event.target.value = '';
+      return;
+    }
+    
+    const confirmed = window.confirm(
+      "⚠️ WARNING: This will replace ALL your current data!\n\n" +
+      "Your foods, history, tags, and settings will be permanently overwritten.\n\n" +
+      "Consider exporting a backup first.\n\n" +
+      "Do you want to continue?"
+    );
+    
+    if (!confirmed) {
+      event.target.value = ''; // Reset file input
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedData = JSON.parse(e.target.result);
+        
+        // Enhanced validation
+        const validateFood = (food, index) => {
+          if (!food || typeof food !== 'object') {
+            throw new Error(`Food at index ${index} is not a valid object`);
+          }
+          if (!food.name || typeof food.name !== 'string') {
+            throw new Error(`Food at index ${index} missing valid name`);
+          }
+          if (!food.category || typeof food.category !== 'string') {
+            throw new Error(`Food at index ${index} missing valid category`);
+          }
+          if (typeof food.ameliaRating !== 'number' || food.ameliaRating < 1 || food.ameliaRating > 5) {
+            throw new Error(`Food "${food.name}" has invalid Amelia rating (must be 1-5)`);
+          }
+          if (typeof food.hazelRating !== 'number' || food.hazelRating < 1 || food.hazelRating > 5) {
+            throw new Error(`Food "${food.name}" has invalid Hazel rating (must be 1-5)`);
+          }
+          if (typeof food.healthRating !== 'number' || food.healthRating < 1 || food.healthRating > 5) {
+            throw new Error(`Food "${food.name}" has invalid health rating (must be 1-5)`);
+          }
+          if (!Array.isArray(food.tags)) {
+            throw new Error(`Food "${food.name}" has invalid tags (must be array)`);
+          }
+        };
+        
+        // Validate main data structure
+        if (!importedData || typeof importedData !== 'object') {
+          throw new Error("Invalid file format: not a valid JSON object");
+        }
+        
+        if (!importedData.foods || !Array.isArray(importedData.foods)) {
+          throw new Error("Invalid data format: foods array missing or invalid");
+        }
+        
+        // Validate each food item
+        importedData.foods.forEach((food, index) => {
+          validateFood(food, index);
+        });
+        
+        // Validate archived foods if present
+        if (importedData.archivedFoods && !Array.isArray(importedData.archivedFoods)) {
+          throw new Error("Invalid data format: archivedFoods must be an array");
+        }
+        
+        if (importedData.archivedFoods) {
+          importedData.archivedFoods.forEach((food, index) => {
+            validateFood(food, index);
+          });
+        }
+        
+        // Validate lunch history if present
+        if (importedData.lunchHistory && !Array.isArray(importedData.lunchHistory)) {
+          throw new Error("Invalid data format: lunchHistory must be an array");
+        }
+        
+        // Validate smart planning weights if present
+        if (importedData.smartPlanningWeights) {
+          const weights = importedData.smartPlanningWeights;
+          if (typeof weights.preferenceWeight !== 'number' || weights.preferenceWeight < 0 || weights.preferenceWeight > 100) {
+            throw new Error("Invalid smart planning weights: preferenceWeight must be 0-100");
+          }
+          if (typeof weights.varietyWeight !== 'number' || weights.varietyWeight < 0 || weights.varietyWeight > 100) {
+            throw new Error("Invalid smart planning weights: varietyWeight must be 0-100");
+          }
+          if (typeof weights.frequencyWeight !== 'number' || weights.frequencyWeight < 0 || weights.frequencyWeight > 100) {
+            throw new Error("Invalid smart planning weights: frequencyWeight must be 0-100");
+          }
+        }
+        
+        // Check data format version compatibility
+        if (importedData.dataFormatVersion && importedData.dataFormatVersion !== "1.1") {
+          const proceed = window.confirm(
+            `⚠️ Version Warning:\n\n` +
+            `This data file is from version ${importedData.dataFormatVersion || 'unknown'}.\n` +
+            `Current app supports version 1.1.\n\n` +
+            `The import might work but could cause issues.\n\n` +
+            `Continue anyway?`
+          );
+          if (!proceed) {
+            event.target.value = '';
+            return;
+          }
+        }
+        
+        // Import all the data
+        setFoods(importedData.foods || []);
+        setArchivedFoods(importedData.archivedFoods || []);
+        setLunchHistory(importedData.lunchHistory || []);
+        setAvailableTags(importedData.availableTags || ['🍓 fruity', '🧀 savoury', '🥨 crunchy', '🍬 chewy', '🍞 soft', '🍪 treat', '🍴 needs-cutlery']);
+        setSmartPlanningWeights(importedData.smartPlanningWeights || {
+          preferenceWeight: 70,
+          varietyWeight: 20,
+          frequencyWeight: 10
+        });
+        setAppSettings(importedData.appSettings || {
+          maxHistoryDays: 90,
+          autoArchiveThreshold: 60,
+          defaultServings: 1,
+          showUsageInPlanning: true,
+          compactMode: false
+        });
+        
+        // Import filters if present
+        if (importedData.filters) {
+          setFilters(importedData.filters);
+        }
+        
+        showMotivationalMessage('data_imported');
+        const importSummary = `✅ Data imported successfully!\n\n` +
+          `• Foods: ${importedData.foods.length}\n` +
+          `• Archived: ${(importedData.archivedFoods || []).length}\n` +
+          `• History: ${(importedData.lunchHistory || []).length} days\n` +
+          `• Tags: ${(importedData.availableTags || []).length}`;
+        alert(importSummary);
+        
+      } catch (error) {
+        console.error('Import error:', error);
+        alert(`❌ Error importing data:\n\n${error.message}\n\nPlease check that your file is a valid lunchbox manager export.`);
+      }
+      
+      event.target.value = ''; // Reset file input
+    };
+    
+    reader.onerror = () => {
+      alert("❌ Error reading file. Please try again.");
+      event.target.value = '';
+    };
+    
+    reader.readAsText(file);
+  };
+
   // Initialize sample data
   useEffect(() => {
     if (foods.length === 0) {
       const sampleFoods = [
-        { id: 1, name: 'Rice crackers', category: 'snack', prep: 'none', ameliaRating: 5, hazelRating: 5, healthRating: 3, tags: ['crunchy', 'savoury'], available: true, servings: 10 },
-        { id: 2, name: 'Mamee noodles', category: 'snack', prep: 'none', ameliaRating: 4, hazelRating: 4, healthRating: 2, tags: ['crunchy', 'savoury'], available: true, servings: 2 },
-        { id: 3, name: 'Soy crisps', category: 'snack', prep: 'none', ameliaRating: 4, hazelRating: 3, healthRating: 3, tags: ['crunchy', 'savoury'], available: true, servings: 8 },
-        { id: 4, name: 'Fruit pouch', category: 'snack', prep: 'none', ameliaRating: 3, hazelRating: 4, healthRating: 4, tags: ['fruity', 'chewy'], available: true, servings: 6 },
-        { id: 5, name: 'Mini cookies', category: 'snack', prep: 'none', ameliaRating: 5, hazelRating: 5, healthRating: 1, tags: ['treat', 'soft'], available: true, servings: 20 },
-        { id: 6, name: 'Seaweed snacks', category: 'snack', prep: 'none', ameliaRating: 2, hazelRating: 4, healthRating: 4, tags: ['savoury', 'crunchy'], available: true, servings: 15 },
-        { id: 7, name: 'Apple slices', category: 'fruit', prep: 'low', ameliaRating: 4, hazelRating: 5, healthRating: 5, tags: ['fruity', 'crunchy'], available: true, servings: null },
-        { id: 8, name: 'Banana', category: 'fruit', prep: 'none', ameliaRating: 3, hazelRating: 4, healthRating: 5, tags: ['fruity', 'soft'], available: true, servings: null },
-        { id: 9, name: 'Grapes', category: 'fruit', prep: 'none', ameliaRating: 5, hazelRating: 3, healthRating: 4, tags: ['fruity', 'soft'], available: true, servings: null },
-        { id: 10, name: 'Orange segments', category: 'fruit', prep: 'low', ameliaRating: 3, hazelRating: 5, healthRating: 5, tags: ['fruity', 'soft'], available: true, servings: null },
-        { id: 11, name: 'Buttery spaghetti', category: 'main', prep: 'high', ameliaRating: 5, hazelRating: 4, healthRating: 3, tags: ['savoury', 'soft'], available: true, servings: null },
-        { id: 12, name: 'Rice with furikake', category: 'main', prep: 'medium', ameliaRating: 4, hazelRating: 5, healthRating: 4, tags: ['savoury', 'soft'], available: true, servings: null },
-        { id: 13, name: 'Chicken nuggets', category: 'main', prep: 'medium', ameliaRating: 5, hazelRating: 4, healthRating: 3, tags: ['savoury', 'crunchy'], available: true, servings: null },
-        { id: 14, name: 'Sandwich rolls', category: 'main', prep: 'low', ameliaRating: 3, hazelRating: 3, healthRating: 4, tags: ['savoury', 'soft'], available: true, servings: null },
-        { id: 15, name: 'Carrot sticks', category: 'veggie', prep: 'low', ameliaRating: 3, hazelRating: 3, healthRating: 5, tags: ['savoury', 'crunchy'], available: true, servings: null },
-        { id: 16, name: 'Cucumber slices', category: 'veggie', prep: 'low', ameliaRating: 4, hazelRating: 2, healthRating: 5, tags: ['savoury', 'crunchy'], available: true, servings: null },
-        { id: 17, name: 'Cherry tomatoes', category: 'veggie', prep: 'none', ameliaRating: 2, hazelRating: 4, healthRating: 5, tags: ['savoury', 'soft'], available: true, servings: null },
-        { id: 18, name: 'Bell pepper strips', category: 'veggie', prep: 'low', ameliaRating: 3, hazelRating: 3, healthRating: 5, tags: ['savoury', 'crunchy'], available: true, servings: null }
+        // *** FRUITS ***
+        { id: 1, name: "Bananas", category: "fruit", prep: "low", ameliaRating: 5, hazelRating: 5, healthRating: 5, tags: ["🍓 fruity", "🍞 soft"], available: true, servings: null },
+        { id: 2, name: "Pink Lady Apples", category: "fruit", prep: "low", ameliaRating: 5, hazelRating: 5, healthRating: 5, tags: ["🍓 fruity", "🥨 crunchy"], available: true, servings: null },
+        { id: 3, name: "Apple slices", category: "fruit", prep: "low", ameliaRating: 4, hazelRating: 5, healthRating: 5, tags: ["🍓 fruity", "🥨 crunchy"], available: true, servings: null },
+        { id: 4, name: "Grapes", category: "fruit", prep: "none", ameliaRating: 5, hazelRating: 3, healthRating: 4, tags: ["🍓 fruity", "🍞 soft"], available: true, servings: null },
+        { id: 5, name: "Orange segments", category: "fruit", prep: "low", ameliaRating: 3, hazelRating: 5, healthRating: 5, tags: ["🍓 fruity", "🍞 soft"], available: true, servings: null },
+        { id: 6, name: "Dried Mango", category: "fruit", prep: "none", ameliaRating: 4, hazelRating: 5, healthRating: 4, tags: ["🍓 fruity", "🍬 chewy"], available: true, servings: 6 },
+        { id: 7, name: "Fruit Strings", category: "fruit", prep: "low", ameliaRating: 4, hazelRating: 5, healthRating: 4, tags: ["🍓 fruity", "🍬 chewy"], available: true, servings: 8 },
+        { id: 8, name: "Dried Blueberries", category: "fruit", prep: "none", ameliaRating: 4, hazelRating: 4, healthRating: 4, tags: ["🍓 fruity", "🍬 chewy"], available: true, servings: 6 },
+        { id: 9, name: "Grape Roll Ups", category: "fruit", prep: "none", ameliaRating: 4, hazelRating: 4, healthRating: 4, tags: ["🍓 fruity", "🍬 chewy"], available: true, servings: 6 },
+        { id: 10, name: "Mandarin Segments", category: "fruit", prep: "low", ameliaRating: 4, hazelRating: 4, healthRating: 4, tags: ["🍓 fruity", "🍞 soft", "🍴 needs-cutlery"], available: true, servings: 4 },
+        
+        // *** SNACKS (ADHD-friendly & sensory-focused) ***
+        { id: 11, name: "Rice crackers", category: "snack", prep: "none", ameliaRating: 5, hazelRating: 5, healthRating: 3, tags: ["🥨 crunchy", "🧀 savoury"], available: true, servings: 10 },
+        { id: 12, name: "Mamee noodles", category: "snack", prep: "none", ameliaRating: 4, hazelRating: 4, healthRating: 2, tags: ["🥨 crunchy", "🧀 savoury"], available: true, servings: 2 },
+        { id: 13, name: "Soy crisps", category: "snack", prep: "none", ameliaRating: 4, hazelRating: 3, healthRating: 3, tags: ["🥨 crunchy", "🧀 savoury"], available: true, servings: 8 },
+        { id: 14, name: "Fruit pouch", category: "snack", prep: "none", ameliaRating: 3, hazelRating: 4, healthRating: 4, tags: ["🍓 fruity", "🍞 soft"], available: true, servings: 6 },
+        { id: 15, name: "Seaweed snacks", category: "snack", prep: "none", ameliaRating: 2, hazelRating: 4, healthRating: 4, tags: ["🧀 savoury", "🥨 crunchy"], available: true, servings: 15 },
+        { id: 16, name: "Peanut Butter Pretzels", category: "snack", prep: "none", ameliaRating: 3, hazelRating: 4, healthRating: 3, tags: ["🧀 savoury", "🥨 crunchy"], available: true, servings: 8 },
+        { id: 17, name: "Sweet & Salty Popcorn", category: "snack", prep: "low", ameliaRating: 3, hazelRating: 5, healthRating: 4, tags: ["🧀 savoury", "🥨 crunchy"], available: true, servings: 4 },
+        { id: 18, name: "Apple Sauce", category: "snack", prep: "none", ameliaRating: 4, hazelRating: 4, healthRating: 3, tags: ["🍓 fruity", "🍞 soft"], available: true, servings: 4 },
+        { id: 19, name: "Greek Yogurt Pouch Strawberry", category: "snack", prep: "none", ameliaRating: 4, hazelRating: 4, healthRating: 4, tags: ["🍓 fruity", "🍞 soft"], available: true, servings: 1 },
+        { id: 20, name: "Vanilla Greek Yogurt", category: "snack", prep: "low", ameliaRating: 4, hazelRating: 4, healthRating: 4, tags: ["🧀 savoury", "🍞 soft", "🍴 needs-cutlery"], available: true, servings: 1 },
+        { id: 21, name: "Peach Yogurt", category: "snack", prep: "low", ameliaRating: 4, hazelRating: 4, healthRating: 4, tags: ["🍓 fruity", "🍞 soft", "🍴 needs-cutlery"], available: true, servings: 1 },
+        { id: 22, name: "Crackers", category: "snack", prep: "none", ameliaRating: 3, hazelRating: 3, healthRating: 3, tags: ["🧀 savoury", "🥨 crunchy"], available: true, servings: 10 },
+        { id: 23, name: "Vegetable Chips", category: "snack", prep: "none", ameliaRating: 3, hazelRating: 3, healthRating: 3, tags: ["🧀 savoury", "🥨 crunchy"], available: true, servings: 6 },
+        { id: 24, name: "Pretzel Twists", category: "snack", prep: "none", ameliaRating: 3, hazelRating: 3, healthRating: 3, tags: ["🧀 savoury", "🥨 crunchy"], available: true, servings: 8 },
+        { id: 25, name: "Cheese sticks", category: "snack", prep: "none", ameliaRating: 4, hazelRating: 3, healthRating: 3, tags: ["🧀 savoury", "🍞 soft"], available: true, servings: 8 },
+        { id: 26, name: "Shapes crackers", category: "snack", prep: "none", ameliaRating: 5, hazelRating: 4, healthRating: 2, tags: ["🧀 savoury", "🥨 crunchy"], available: true, servings: 12 },
+        { id: 27, name: "Cheese cubes", category: "snack", prep: "low", ameliaRating: 3, hazelRating: 4, healthRating: 3, tags: ["🧀 savoury", "🍞 soft"], available: true, servings: 10 },
+        { id: 28, name: "Tiny Teddies", category: "snack", prep: "none", ameliaRating: 5, hazelRating: 5, healthRating: 2, tags: ["🧀 savoury", "🥨 crunchy"], available: true, servings: 8 },
+        { id: 29, name: "Vita-Weat crackers", category: "snack", prep: "none", ameliaRating: 4, hazelRating: 3, healthRating: 3, tags: ["🧀 savoury", "🥨 crunchy"], available: true, servings: 6 },
+        { id: 30, name: "Mini muffins", category: "snack", prep: "none", ameliaRating: 5, hazelRating: 4, healthRating: 2, tags: ["🧀 savoury", "🍞 soft"], available: true, servings: 4 },
+        { id: 51, name: "YoGo", category: "snack", prep: "none", ameliaRating: 4, hazelRating: 5, healthRating: 3, tags: ["🍓 fruity", "🍞 soft"], available: true, servings: 1 },
+        { id: 52, name: "LCMs bars", category: "snack", prep: "none", ameliaRating: 4, hazelRating: 4, healthRating: 2, tags: ["🧀 savoury", "🍬 chewy"], available: true, servings: 6 },
+        { id: 53, name: "Cheese & Bacon Balls", category: "snack", prep: "none", ameliaRating: 3, hazelRating: 4, healthRating: 2, tags: ["🧀 savoury", "🥨 crunchy"], available: true, servings: 8 },
+        
+        // *** VEGGIES (ADHD sensory-friendly) ***
+        { id: 31, name: "Baby carrots", category: "veggie", prep: "low", ameliaRating: 3, hazelRating: 3, healthRating: 5, tags: ["🧀 savoury", "🥨 crunchy"], available: true, servings: null },
+        { id: 32, name: "Cucumber slices", category: "veggie", prep: "low", ameliaRating: 4, hazelRating: 2, healthRating: 5, tags: ["🧀 savoury", "🥨 crunchy"], available: true, servings: null },
+        { id: 33, name: "Cherry tomatoes", category: "veggie", prep: "none", ameliaRating: 2, hazelRating: 4, healthRating: 5, tags: ["🧀 savoury", "🍞 soft"], available: true, servings: null },
+        { id: 34, name: "Red Capsicum strips", category: "veggie", prep: "low", ameliaRating: 3, hazelRating: 4, healthRating: 4, tags: ["🧀 savoury", "🥨 crunchy"], available: true, servings: null },
+        { id: 35, name: "Sugar snap peas", category: "veggie", prep: "none", ameliaRating: 3, hazelRating: 4, healthRating: 5, tags: ["🧀 savoury", "🥨 crunchy"], available: true, servings: null },
+        
+        // *** MAIN ITEMS ***
+        { id: 36, name: "Buttery spaghetti", category: "main", prep: "high", ameliaRating: 5, hazelRating: 4, healthRating: 3, tags: ["🧀 savoury", "🍞 soft", "🍴 needs-cutlery"], available: true, servings: null },
+        { id: 37, name: "Rice with furikake", category: "main", prep: "medium", ameliaRating: 4, hazelRating: 5, healthRating: 4, tags: ["🧀 savoury", "🍞 soft", "🍴 needs-cutlery"], available: true, servings: null },
+        { id: 38, name: "Chicken nuggets", category: "main", prep: "medium", ameliaRating: 5, hazelRating: 4, healthRating: 3, tags: ["🧀 savoury", "🥨 crunchy"], available: true, servings: null },
+        { id: 39, name: "Sandwich rolls", category: "main", prep: "low", ameliaRating: 3, hazelRating: 3, healthRating: 4, tags: ["🧀 savoury", "🍞 soft"], available: true, servings: null },
+        { id: 40, name: "Sourdough Bagels", category: "main", prep: "low", ameliaRating: 3, hazelRating: 3, healthRating: 3, tags: ["🧀 savoury", "🍞 soft"], available: true, servings: 6 },
+        { id: 41, name: "Tortilla Wraps", category: "main", prep: "low", ameliaRating: 3, hazelRating: 3, healthRating: 3, tags: ["🧀 savoury", "🍞 soft"], available: true, servings: 8 },
+        { id: 42, name: "Pasta salad", category: "main", prep: "medium", ameliaRating: 3, hazelRating: 4, healthRating: 3, tags: ["🧀 savoury", "🍞 soft", "🍴 needs-cutlery"], available: true, servings: null },
+        { id: 43, name: "Mini pizzas", category: "main", prep: "medium", ameliaRating: 5, hazelRating: 5, healthRating: 2, tags: ["🧀 savoury", "🍞 soft"], available: true, servings: 4 },
+        
+        // *** TREATS (Australian favourites) ***
+        { id: 44, name: "Mini cookies", category: "treat", prep: "none", ameliaRating: 5, hazelRating: 5, healthRating: 1, tags: ["🍪 treat", "🍞 soft"], available: true, servings: 20 },
+        { id: 45, name: "Chocolate Fruit Treats", category: "treat", prep: "low", ameliaRating: 4, hazelRating: 4, healthRating: 4, tags: ["🍪 treat", "🍓 fruity", "🍬 chewy"], available: true, servings: 8 },
+        { id: 46, name: "Arnotts Biscuits", category: "treat", prep: "none", ameliaRating: 4, hazelRating: 5, healthRating: 2, tags: ["🍪 treat", "🥨 crunchy"], available: true, servings: 10 },
+        { id: 47, name: "Tim Tams (mini)", category: "treat", prep: "none", ameliaRating: 5, hazelRating: 4, healthRating: 1, tags: ["🍪 treat", "🥨 crunchy"], available: true, servings: 6 },
+        { id: 48, name: "Allen's Lollies", category: "treat", prep: "none", ameliaRating: 5, hazelRating: 4, healthRating: 2, tags: ["🍪 treat", "🍬 chewy"], available: true, servings: 8 },
+        { id: 49, name: "Freddo Frogs", category: "treat", prep: "none", ameliaRating: 5, hazelRating: 5, healthRating: 1, tags: ["🍪 treat", "🍞 soft"], available: true, servings: 4 },
+        { id: 50, name: "Roll-Ups", category: "treat", prep: "none", ameliaRating: 4, hazelRating: 4, healthRating: 2, tags: ["🍪 treat", "🍬 chewy"], available: true, servings: 6 }
       ];
       setFoods(sampleFoods);
     }
@@ -395,7 +722,7 @@ const LunchboxManager = () => {
       let extrasItems = selectRandomPreferredItems(lunchExtrasFoods, extrasCount, child, [...usedTags]);
       
       if (shouldIncludeTreat(child) && extrasItems.length < extrasCount) {
-        const treats = getChildFoods('snack', child).filter(f => f.tags.includes('treat'));
+        const treats = getChildFoods('snack', child).filter(f => f.tags.some(tag => tag.includes('treat')));
         const treatItem = selectRandomPreferredItems(treats, 1, child, [...usedTags])[0];
         if (treatItem) {
           extrasItems = [treatItem, ...extrasItems.slice(0, extrasCount - 1)];
@@ -421,6 +748,7 @@ const LunchboxManager = () => {
     };
 
     setTodaysPlan(updatedPlan);
+    showMotivationalMessage('shuffle_complete');
   };
 
 
@@ -478,7 +806,7 @@ const LunchboxManager = () => {
       
       // Add treat if it's a treat day and we have room
       if (shouldIncludeTreat(child) && extrasItems.length < extrasCount) {
-        const treats = getChildFoods('snack', child).filter(f => f.tags.includes('treat'));
+        const treats = getChildFoods('snack', child).filter(f => f.tags.some(tag => tag.includes('treat')));
         const treatItem = selectPreferredItemsWithHistory(treats, 1, child, [...usedTags])[0];
         if (treatItem) {
           extrasItems = [treatItem, ...extrasItems.slice(0, extrasCount - 1)];
@@ -501,6 +829,7 @@ const LunchboxManager = () => {
     };
 
     setTodaysPlan(plan);
+    showMotivationalMessage('plan_generated');
   };
 
   const addFood = () => {
@@ -512,6 +841,7 @@ const LunchboxManager = () => {
         servings: newFood.servings
       };
       setFoods([...foods, food]);
+      showMotivationalMessage('food_added');
       setNewFood({
         name: '',
         category: 'snack',
@@ -707,6 +1037,17 @@ const LunchboxManager = () => {
 
   const confirmPlan = () => {
     if (todaysPlan) {
+      // Check for duplicate date in history
+      const existingEntry = lunchHistory.find(entry => entry.date === todaysPlan.date);
+      if (existingEntry) {
+        const shouldReplace = window.confirm(
+          `You already packed lunches for ${todaysPlan.date}!\n\nDo you want to replace the existing plan with this new one?`
+        );
+        if (!shouldReplace) {
+          return; // User cancelled, don't pack
+        }
+      }
+
       const historyEntry = {
         date: todaysPlan.date,
         amelia: [
@@ -728,9 +1069,15 @@ const LunchboxManager = () => {
       // TODO: Here we would deduct from stock levels for items that have servings
       // For now we just save to history
       
-      setLunchHistory([...lunchHistory, historyEntry]);
+      // Replace existing entry if duplicate, otherwise add new
+      const updatedHistory = existingEntry 
+        ? lunchHistory.map(entry => entry.date === todaysPlan.date ? historyEntry : entry)
+        : [...lunchHistory, historyEntry];
+      
+      setLunchHistory(updatedHistory);
       setTodaysPlan(null);
       setShowPackedConfirmation(true);
+      showMotivationalMessage('lunches_packed');
       
       // Auto-hide confirmation after 3 seconds
       setTimeout(() => {
@@ -743,6 +1090,17 @@ const LunchboxManager = () => {
     return (
       <div className="flex items-center gap-1">
         <span className="text-sm text-gray-600 w-16">{label}:</span>
+        {/* Zero star option */}
+        {!readOnly && onChange && (
+          <button
+            type="button"
+            onClick={() => onChange(0)}
+            className={`${rating === 0 ? 'text-red-500 bg-red-50' : 'text-gray-400'} hover:text-red-400 hover:bg-red-50 px-1 py-0.5 rounded text-xs font-bold border`}
+            title="Never include (0 stars)"
+          >
+            ✗
+          </button>
+        )}
         {[1, 2, 3, 4, 5].map(star => (
           <button
             key={star}
@@ -979,6 +1337,17 @@ const LunchboxManager = () => {
             <p className="text-indigo-100 text-sm sm:text-lg">ADHD-friendly lunch planning for Amelia & Hazel</p>
           </div>
 
+          {/* Motivational Message */}
+          {motivationalMessage && (
+            <div className="bg-gradient-to-r from-green-400 to-blue-500 px-4 py-3 text-center text-white animate-pulse">
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-2xl">{motivationalMessage.emoji}</span>
+                <span className="font-semibold text-lg">{motivationalMessage.text}</span>
+                <span className="text-2xl">{motivationalMessage.emoji}</span>
+              </div>
+            </div>
+          )}
+
           {/* Navigation Tabs */}
           <div className="border-b border-gray-200 bg-gray-50">
             <nav className="flex space-x-1 p-2 overflow-x-auto scrollbar-hide" aria-label="Tabs">
@@ -1030,6 +1399,32 @@ const LunchboxManager = () => {
               >
                 <span>Tags</span>
               </button>
+              
+              <button
+                onClick={() => setActiveTab('help')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
+                  activeTab === 'help' 
+                    ? 'bg-cyan-100 text-cyan-700 shadow-sm' 
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+                }`}
+              >
+                <HelpCircle className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">How to Use</span>
+                <span className="sm:hidden">Help</span>
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 whitespace-nowrap ${
+                  activeTab === 'settings' 
+                    ? 'bg-gray-100 text-gray-700 shadow-sm' 
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+                }`}
+              >
+                <Settings className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Settings</span>
+                <span className="sm:hidden">Settings</span>
+              </button>
             </nav>
           </div>
 
@@ -1075,6 +1470,41 @@ const LunchboxManager = () => {
                     <h3 className="text-lg font-medium text-gray-700">Plan for {todaysPlan.date}</h3>
                   </div>
                   
+                  {/* Treat Day Banner */}
+                  {(() => {
+                    const planDate = getPlanDate();
+                    const dateObj = new Date(planDate);
+                    const dayOfWeek = dateObj.getDay();
+                    const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][dayOfWeek];
+                    
+                    if (dayName === 'monday') {
+                      return (
+                        <div className="bg-gradient-to-r from-pink-100 to-purple-100 border-2 border-pink-200 rounded-xl p-4 text-center">
+                          <div className="text-2xl mb-2">🍪</div>
+                          <div className="font-semibold text-pink-800">Monday Treat Day for Hazel!</div>
+                          <div className="text-sm text-pink-600">A special treat has been added to Hazel's lunch</div>
+                        </div>
+                      );
+                    } else if (dayName === 'thursday') {
+                      return (
+                        <div className="bg-gradient-to-r from-purple-100 to-blue-100 border-2 border-purple-200 rounded-xl p-4 text-center">
+                          <div className="text-2xl mb-2">🍪</div>
+                          <div className="font-semibold text-purple-800">Thursday Treat Day for Amelia!</div>
+                          <div className="text-sm text-purple-600">A special treat has been added to Amelia's lunch</div>
+                        </div>
+                      );
+                    } else if (dayName === 'friday') {
+                      return (
+                        <div className="bg-gradient-to-r from-yellow-100 to-orange-100 border-2 border-yellow-200 rounded-xl p-4 text-center">
+                          <div className="text-2xl mb-2">🎉🍪</div>
+                          <div className="font-semibold text-orange-800">Friday Treat Day for Everyone!</div>
+                          <div className="text-sm text-orange-600">Special treats have been added to both lunchboxes</div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                  
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <div className="flex justify-between items-center border-b-2 border-purple-200 pb-2">
@@ -1103,7 +1533,20 @@ const LunchboxManager = () => {
                             <div key={idx} className="bg-white p-3 rounded border-l-2 border-blue-400">
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
-                                  <div className="font-medium">{item.name}</div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="font-medium">{item.name}</div>
+                                    {(() => {
+                                      const usageCount = getFoodUsageFrequency(item.id);
+                                      if (usageCount > 0) {
+                                        return (
+                                          <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                                            {usageCount}x
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
                                   <div className="flex items-center gap-2 mt-1">
                                     <StarRating rating={item.ameliaRating} label="Rating" readOnly />
                                   </div>
@@ -1696,16 +2139,141 @@ const LunchboxManager = () => {
                 </button>
               </div>
 
+              {/* Enhanced Search & Filter Section */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-6 border border-blue-200">
+                <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center gap-2">
+                  🔍 Search & Filter Foods
+                </h3>
+                
+                {/* Search Bar */}
+                <div className="mb-4">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search by name, category, or tags..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 pl-10"
+                    />
+                    <div className="absolute left-3 top-3.5 text-gray-400">
+                      🔍
+                    </div>
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Rating Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Amelia's Rating</label>
+                    <select
+                      value={filters.ameliaRating}
+                      onChange={(e) => setFilters({...filters, ameliaRating: parseInt(e.target.value)})}
+                      className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500"
+                    >
+                      <option value={0}>Any rating</option>
+                      <option value={5}>⭐⭐⭐⭐⭐ (5 stars)</option>
+                      <option value={4}>⭐⭐⭐⭐ (4 stars)</option>
+                      <option value={3}>⭐⭐⭐ (3 stars)</option>
+                      <option value={2}>⭐⭐ (2 stars)</option>
+                      <option value={1}>⭐ (1 star)</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Hazel's Rating</label>
+                    <select
+                      value={filters.hazelRating}
+                      onChange={(e) => setFilters({...filters, hazelRating: parseInt(e.target.value)})}
+                      className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500"
+                    >
+                      <option value={0}>Any rating</option>
+                      <option value={5}>⭐⭐⭐⭐⭐ (5 stars)</option>
+                      <option value={4}>⭐⭐⭐⭐ (4 stars)</option>
+                      <option value={3}>⭐⭐⭐ (3 stars)</option>
+                      <option value={2}>⭐⭐ (2 stars)</option>
+                      <option value={1}>⭐ (1 star)</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Health Rating</label>
+                    <select
+                      value={filters.healthRating}
+                      onChange={(e) => setFilters({...filters, healthRating: parseInt(e.target.value)})}
+                      className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500"
+                    >
+                      <option value={0}>Any health rating</option>
+                      <option value={5}>💚💚💚💚💚 (Very healthy)</option>
+                      <option value={4}>💚💚💚💚 (Healthy)</option>
+                      <option value={3}>💚💚💚 (Moderate)</option>
+                      <option value={2}>💚💚 (Treat)</option>
+                      <option value={1}>💚 (Occasional)</option>
+                    </select>
+                  </div>
+                </div>
+                
+                {/* Filter Summary & Clear */}
+                <div className="mt-4 flex justify-between items-center">
+                  <div className="text-sm text-gray-600">
+                    {(() => {
+                      const totalFiltered = filterFoodsBySearch(foods).length;
+                      const activeFilters = [
+                        searchQuery && 'search',
+                        filters.ameliaRating > 0 && 'Amelia rating',
+                        filters.hazelRating > 0 && 'Hazel rating', 
+                        filters.healthRating > 0 && 'health rating'
+                      ].filter(Boolean);
+                      
+                      if (activeFilters.length === 0) {
+                        return `Showing all ${foods.length} foods`;
+                      } else {
+                        return `Showing ${totalFiltered} of ${foods.length} foods (filtered by: ${activeFilters.join(', ')})`;
+                      }
+                    })()}
+                  </div>
+                  
+                  {(searchQuery || filters.ameliaRating > 0 || filters.hazelRating > 0 || filters.healthRating > 0) && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery('');
+                        setFilters({
+                          ameliaRating: 0,
+                          hazelRating: 0,
+                          healthRating: 0,
+                          category: 'all'
+                        });
+                      }}
+                      className="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600"
+                    >
+                      Clear All Filters
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className="space-y-6">
-                {['snack', 'fruit', 'main', 'veggie'].map(category => (
+                {['snack', 'fruit', 'main', 'veggie'].map(category => {
+                  const categoryFoods = filterFoodsBySearch(foods.filter(f => f.category === category));
+                  if (categoryFoods.length === 0) return null;
+                  
+                  return (
                   <div key={category} className="border-2 border-gray-200 rounded-xl p-6 bg-gradient-to-r from-gray-50 to-white">
                     <h3 className="text-xl font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200 capitalize">
                       {category === 'snack' ? '🍿 Snacks & Sides' : 
                        category === 'fruit' ? '🍎 Fruits' :
                        category === 'main' ? '🍽️ Main Dishes' : '🥕 Vegetables'} Options
+                       <span className="text-sm font-normal text-gray-500 ml-2">({categoryFoods.length})</span>
                     </h3>
                     <div className="grid gap-3">
-                      {foods.filter(f => f.category === category).map(food => (
+                      {categoryFoods.map(food => (
                         <div key={food.id} className="bg-gray-50 p-3 rounded-lg">
                           <div className="flex justify-between items-start mb-2">
                             <div className="flex-1">
@@ -1720,6 +2288,17 @@ const LunchboxManager = () => {
                                     {food.servings} {food.servings === 1 ? 'serving' : 'servings'}
                                   </span>
                                 )}
+                                {(() => {
+                                  const usageCount = getFoodUsageFrequency(food.id);
+                                  if (usageCount > 0) {
+                                    return (
+                                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                        📊 {usageCount}x last 2 weeks
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
                               {isRunningLow(food) && (
                                 <div className="mt-2">
@@ -1772,7 +2351,8 @@ const LunchboxManager = () => {
                       ))}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Out of Stock Section */}
@@ -1880,6 +2460,406 @@ const LunchboxManager = () => {
                       </button>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'help' && (
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-xl p-6 mb-6 border border-cyan-200">
+                <h2 className="text-2xl font-bold text-cyan-800 mb-2">🎯 How to Use Lunchbox Manager</h2>
+                <p className="text-cyan-600">Your guide to stress-free, ADHD-friendly lunch planning!</p>
+              </div>
+
+              <div className="space-y-6">
+                {/* Quick Start */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-green-700 mb-4 flex items-center gap-2">
+                    🚀 Quick Start
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded-full">1</span>
+                      <p><strong>Generate Plan:</strong> Click "Generate Plan" to create smart lunch recommendations for both kids</p>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded-full">2</span>
+                      <p><strong>Customize:</strong> Don't like something? Use the shuffle buttons to swap individual items or shuffle everything</p>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded-full">3</span>
+                      <p><strong>Pack & Go:</strong> When you're happy, click "Pack These Lunches!" to save them to history</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Smart Features */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-blue-700 mb-4 flex items-center gap-2">
+                    🧠 Smart Features
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="font-medium text-gray-800 mb-2">⭐ Kid Preferences</h4>
+                      <p className="text-sm text-gray-600">Plans prioritize foods each kid actually likes (higher star ratings)</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-800 mb-2">🔄 Variety Boost</h4>
+                      <p className="text-sm text-gray-600">Avoids repeating foods from the last 2 days automatically</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-800 mb-2">🍪 Treat Days</h4>
+                      <p className="text-sm text-gray-600">Monday (Hazel), Thursday (Amelia), Friday (Both kids)</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-800 mb-2">🍴 Helper Tags</h4>
+                      <p className="text-sm text-gray-600">Spots foods that need cutlery, are crunchy, soft, etc.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Buttons Guide */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-purple-700 mb-4 flex items-center gap-2">
+                    🎛️ Button Guide
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm font-medium">Generate Plan</div>
+                      <p className="text-sm">Creates a completely new lunch plan using smart preferences</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="bg-purple-100 text-purple-700 px-3 py-1 rounded-lg text-sm font-medium">Shuffle Everything</div>
+                      <p className="text-sm">Randomly changes ALL items in one kid's lunchbox</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="bg-gray-100 text-gray-700 px-3 py-1 rounded-lg text-sm font-medium">🔄</div>
+                      <p className="text-sm">Swaps just one specific item (appears next to each food)</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Food Management */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-orange-700 mb-4 flex items-center gap-2">
+                    🍎 Managing Foods
+                  </h3>
+                  <div className="space-y-3">
+                    <p><strong>Add Foods:</strong> Use the "Manage Foods" tab to add new items with ratings for each kid</p>
+                    <p><strong>Stock Levels:</strong> Set serving counts for packaged items - when you run low, you'll see warnings</p>
+                    <p><strong>Archive Items:</strong> Hide foods you're out of without deleting them permanently</p>
+                    <p><strong>Star Ratings:</strong> 5 = loves it, 3 = okay, 1 = will eat if necessary, 0 = never include</p>
+                  </div>
+                </div>
+
+                {/* Tips */}
+                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200 p-6">
+                  <h3 className="text-lg font-semibold text-yellow-800 mb-4 flex items-center gap-2">
+                    💡 Pro Tips
+                  </h3>
+                  <div className="space-y-2 text-sm text-yellow-700">
+                    <p>• The app avoids 0-star foods completely, so rate honestly!</p>
+                    <p>• Higher-rated main dishes = fewer side items (assumes kids will eat more)</p>
+                    <p>• Check the History tab to see what worked well before</p>
+                    <p>• Use tags like "🍴 needs-cutlery" to remember important details</p>
+                    <p>• The app gets smarter as you use it - ratings and history matter!</p>
+                  </div>
+                </div>
+
+                {/* Troubleshooting */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-red-700 mb-4 flex items-center gap-2">
+                    🔧 Common Questions
+                  </h3>
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <p><strong>Q: Why isn't my favorite food showing up?</strong></p>
+                      <p className="text-gray-600 ml-4">A: Check it's not archived and has a rating above 0 for that child</p>
+                    </div>
+                    <div>
+                      <p><strong>Q: Can I pack lunches for the same date twice?</strong></p>
+                      <p className="text-gray-600 ml-4">A: The app will warn you and ask if you want to replace the existing plan</p>
+                    </div>
+                    <div>
+                      <p><strong>Q: How does the "variety" feature work?</strong></p>
+                      <p className="text-gray-600 ml-4">A: It looks at the last 2 days and makes recently used foods less likely to be selected</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'settings' && (
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl p-6 mb-6 border border-gray-200">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">⚙️ Settings & Data Management</h2>
+                <p className="text-gray-600">Configure smart planning weights and manage your data</p>
+              </div>
+
+              <div className="space-y-6">
+                {/* Smart Planning Weights */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-blue-700 mb-4 flex items-center gap-2">
+                    🧠 Smart Planning Weights
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Adjust how the app prioritizes foods when generating lunch plans. All weights should add up to 100%.
+                  </p>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Kid Preferences: {smartPlanningWeights.preferenceWeight}%
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={smartPlanningWeights.preferenceWeight}
+                        onChange={(e) => setSmartPlanningWeights({
+                          ...smartPlanningWeights,
+                          preferenceWeight: parseInt(e.target.value)
+                        })}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">How much the star ratings matter</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Variety/History Avoidance: {smartPlanningWeights.varietyWeight}%
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={smartPlanningWeights.varietyWeight}
+                        onChange={(e) => setSmartPlanningWeights({
+                          ...smartPlanningWeights,
+                          varietyWeight: parseInt(e.target.value)
+                        })}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">How much to avoid recently used foods</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Usage Frequency: {smartPlanningWeights.frequencyWeight}%
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={smartPlanningWeights.frequencyWeight}
+                        onChange={(e) => setSmartPlanningWeights({
+                          ...smartPlanningWeights,
+                          frequencyWeight: parseInt(e.target.value)
+                        })}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Promote unused foods or popular ones</p>
+                    </div>
+                    
+                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-600">
+                        <strong>Total:</strong> {smartPlanningWeights.preferenceWeight + smartPlanningWeights.varietyWeight + smartPlanningWeights.frequencyWeight}%
+                        {(smartPlanningWeights.preferenceWeight + smartPlanningWeights.varietyWeight + smartPlanningWeights.frequencyWeight) !== 100 && (
+                          <span className="text-orange-600 ml-2">⚠️ Should total 100%</span>
+                        )}
+                      </p>
+                    </div>
+                    
+                    <button
+                      onClick={() => setSmartPlanningWeights({
+                        preferenceWeight: 70,
+                        varietyWeight: 20,
+                        frequencyWeight: 10
+                      })}
+                      className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 text-sm"
+                    >
+                      Reset to Defaults
+                    </button>
+                  </div>
+                </div>
+
+                {/* App Settings */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-purple-700 mb-4 flex items-center gap-2">
+                    ⚙️ App Settings
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Configure app behavior and display preferences.
+                  </p>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Maximum History Days: {appSettings.maxHistoryDays}
+                      </label>
+                      <input
+                        type="range"
+                        min="30"
+                        max="365"
+                        value={appSettings.maxHistoryDays}
+                        onChange={(e) => setAppSettings({
+                          ...appSettings,
+                          maxHistoryDays: parseInt(e.target.value)
+                        })}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">How long to keep lunch history (30-365 days)</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Auto-Archive Threshold: {appSettings.autoArchiveThreshold} days
+                      </label>
+                      <input
+                        type="range"
+                        min="14"
+                        max="180"
+                        value={appSettings.autoArchiveThreshold}
+                        onChange={(e) => setAppSettings({
+                          ...appSettings,
+                          autoArchiveThreshold: parseInt(e.target.value)
+                        })}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Suggest archiving foods unused for this many days</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Default Servings: {appSettings.defaultServings}
+                      </label>
+                      <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        value={appSettings.defaultServings}
+                        onChange={(e) => setAppSettings({
+                          ...appSettings,
+                          defaultServings: parseInt(e.target.value)
+                        })}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Default servings when adding new foods</p>
+                    </div>
+                    
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="showUsageInPlanning"
+                        checked={appSettings.showUsageInPlanning}
+                        onChange={(e) => setAppSettings({
+                          ...appSettings,
+                          showUsageInPlanning: e.target.checked
+                        })}
+                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="showUsageInPlanning" className="text-sm font-medium text-gray-700">
+                        Show usage frequency in planning view
+                      </label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="compactMode"
+                        checked={appSettings.compactMode}
+                        onChange={(e) => setAppSettings({
+                          ...appSettings,
+                          compactMode: e.target.checked
+                        })}
+                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="compactMode" className="text-sm font-medium text-gray-700">
+                        Use compact display mode
+                      </label>
+                    </div>
+                    
+                    <button
+                      onClick={() => setAppSettings({
+                        maxHistoryDays: 90,
+                        autoArchiveThreshold: 60,
+                        defaultServings: 1,
+                        showUsageInPlanning: true,
+                        compactMode: false
+                      })}
+                      className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 text-sm"
+                    >
+                      Reset to Defaults
+                    </button>
+                  </div>
+                </div>
+
+                {/* Data Export/Import */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-green-700 mb-4 flex items-center gap-2">
+                    💾 Data Backup & Restore
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Export your foods, history, tags, and settings as a JSON file for backup or migration.
+                  </p>
+                  
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <button
+                      onClick={exportData}
+                      className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 flex items-center gap-2 font-medium"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export All Data
+                    </button>
+                    
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={importData}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        id="import-file"
+                      />
+                      <label
+                        htmlFor="import-file"
+                        className="bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700 flex items-center gap-2 font-medium cursor-pointer inline-flex"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Import Data
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <h4 className="font-medium text-yellow-800 mb-2">⚠️ Important Notes:</h4>
+                    <ul className="text-sm text-yellow-700 space-y-1">
+                      <li>• Export creates a complete backup of all your data</li>
+                      <li>• Import will replace ALL existing data permanently</li>
+                      <li>• Always export a backup before importing new data</li>
+                      <li>• File format is standard JSON - readable and portable</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* App Info */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-purple-700 mb-4 flex items-center gap-2">
+                    📱 App Information
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p><strong>Total Foods:</strong> {foods.length}</p>
+                      <p><strong>Archived Foods:</strong> {archivedFoods.length}</p>
+                      <p><strong>Available Tags:</strong> {availableTags.length}</p>
+                    </div>
+                    <div>
+                      <p><strong>Lunch History:</strong> {lunchHistory.length} days</p>
+                      <p><strong>App Version:</strong> 1.1.0</p>
+                      <p><strong>Last Updated:</strong> {new Date().toLocaleDateString()}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

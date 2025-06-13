@@ -1,0 +1,820 @@
+{
+  "lunchbox_items": [
+    {
+      "name": "Apple Sauce",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 4
+      },
+      "health": 3,
+      "prep": "none",
+      "tags": [
+        "🍎 Fresh Fruit",
+        "📦 Packaged"
+      ],
+      "notes": "Common lunchbox item"
+    },
+    {
+      "name": "Bananas",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 5,
+        "hazel": 5
+      },
+      "health": 5,
+      "prep": "low",
+      "tags": [
+        "🍎 Fresh Fruit"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Berry Breakfast Bites",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 4
+      },
+      "health": 4,
+      "prep": "low",
+      "tags": [
+        "🍎 Fresh Fruit"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Chocolate Fruit Treats",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 4
+      },
+      "health": 4,
+      "prep": "low",
+      "tags": [
+        "🍎 Fresh Fruit",
+        "🍫 Chocolate"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Dried Blueberries",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 4
+      },
+      "health": 4,
+      "prep": "none",
+      "tags": [
+        "🍎 Fresh Fruit",
+        "🌞 Dried"
+      ],
+      "notes": "Common lunchbox item"
+    },
+    {
+      "name": "Dried Mango",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 5
+      },
+      "health": 4,
+      "prep": "none",
+      "tags": [
+        "🍎 Fresh Fruit",
+        "🌞 Dried"
+      ],
+      "notes": "Common lunchbox item"
+    },
+    {
+      "name": "Fruit Filled 12 Bars",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 5
+      },
+      "health": 4,
+      "prep": "none",
+      "tags": [
+        "🍎 Fresh Fruit"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Fruit Puree Mixed Berry",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 5
+      },
+      "health": 4,
+      "prep": "low",
+      "tags": [
+        "🍎 Fresh Fruit"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Fruit Strings",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 5
+      },
+      "health": 4,
+      "prep": "low",
+      "tags": [
+        "🍎 Fresh Fruit",
+        "🎒 School Friendly",
+        "📦 Multi-pack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Grape Roll Ups",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 4
+      },
+      "health": 4,
+      "prep": "none",
+      "tags": [
+        "🍎 Fresh Fruit",
+        "🎒 School Friendly"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Greek Yogurt Pouch Mango",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 4
+      },
+      "health": 4,
+      "prep": "none",
+      "tags": [
+        "🍎 Fresh Fruit",
+        "📦 Packaged"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Greek Yogurt Pouch Strawberry",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 4
+      },
+      "health": 4,
+      "prep": "none",
+      "tags": [
+        "🍎 Fresh Fruit",
+        "📦 Packaged"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Mandarin Segments In Syrup",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 4
+      },
+      "health": 4,
+      "prep": "low",
+      "tags": [
+        "🍎 Fresh Fruit"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Mango Fruit Puree Blend Pouch",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 5
+      },
+      "health": 4,
+      "prep": "none",
+      "tags": [
+        "🍎 Fresh Fruit",
+        "📦 Packaged"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Mango Slices",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 4
+      },
+      "health": 4,
+      "prep": "low",
+      "tags": [
+        "🍎 Fresh Fruit"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Mango Yogurt Pouch",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 4
+      },
+      "health": 4,
+      "prep": "none",
+      "tags": [
+        "🍎 Fresh Fruit",
+        "📦 Packaged"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Passionfruit & Chia Seed Bites",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 5
+      },
+      "health": 4,
+      "prep": "low",
+      "tags": [
+        "🍎 Fresh Fruit"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Passionfruit Yogurt Pouch",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 5
+      },
+      "health": 4,
+      "prep": "none",
+      "tags": [
+        "🍎 Fresh Fruit",
+        "📦 Packaged"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Pink Lady Apples",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 5,
+        "hazel": 5
+      },
+      "health": 5,
+      "prep": "low",
+      "tags": [
+        "🍎 Fresh Fruit"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Strips Apple & Strawberry",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 5,
+        "hazel": 5
+      },
+      "health": 5,
+      "prep": "low",
+      "tags": [
+        "🍎 Fresh Fruit"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Yoghurt Pouch Raspberry",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 4
+      },
+      "health": 4,
+      "prep": "none",
+      "tags": [
+        "🍎 Fresh Fruit",
+        "📦 Packaged"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Yoghurt Pouch Strawberry",
+      "category": "fruit",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 4
+      },
+      "health": 4,
+      "prep": "none",
+      "tags": [
+        "🍎 Fresh Fruit",
+        "📦 Packaged"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Brioche Rolls",
+      "category": "main",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 3
+      },
+      "health": 3,
+      "prep": "medium",
+      "tags": [
+        "🍞 Main Item"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Eggs",
+      "category": "main",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 3
+      },
+      "health": 3,
+      "prep": "low",
+      "tags": [
+        "🍞 Main Item"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Mini Taco Shells",
+      "category": "main",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 3
+      },
+      "health": 3,
+      "prep": "low",
+      "tags": [
+        "🍞 Main Item"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Sourdough Bagels",
+      "category": "main",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 3
+      },
+      "health": 3,
+      "prep": "low",
+      "tags": [
+        "🍞 Main Item"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Tortilla Wraps",
+      "category": "main",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 3
+      },
+      "health": 3,
+      "prep": "low",
+      "tags": [
+        "🍞 Main Item"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "BBQ Shapes",
+      "category": "snack",
+      "ratings": {
+        "amelia": 2,
+        "hazel": 2
+      },
+      "health": 2,
+      "prep": "none",
+      "tags": [
+        "🍿 Snack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Cheesey Peelers",
+      "category": "snack",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 3
+      },
+      "health": 3,
+      "prep": "low",
+      "tags": [
+        "🍿 Snack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Chicken Flavored Chips",
+      "category": "snack",
+      "ratings": {
+        "amelia": 2,
+        "hazel": 2
+      },
+      "health": 2,
+      "prep": "none",
+      "tags": [
+        "🍿 Snack",
+        "🎒 School Friendly",
+        "📦 Multi-pack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Cracked Pepper Crackers",
+      "category": "snack",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 3
+      },
+      "health": 3,
+      "prep": "none",
+      "tags": [
+        "🍿 Snack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Crackers",
+      "category": "snack",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 3
+      },
+      "health": 3,
+      "prep": "none",
+      "tags": [
+        "🍿 Snack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Crinkle Cut Chips",
+      "category": "snack",
+      "ratings": {
+        "amelia": 2,
+        "hazel": 2
+      },
+      "health": 2,
+      "prep": "none",
+      "tags": [
+        "🍿 Snack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Fun Mix",
+      "category": "snack",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 3
+      },
+      "health": 3,
+      "prep": "low",
+      "tags": [
+        "🍿 Snack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Mixed Potato Chips",
+      "category": "snack",
+      "ratings": {
+        "amelia": 2,
+        "hazel": 2
+      },
+      "health": 2,
+      "prep": "none",
+      "tags": [
+        "🍿 Snack",
+        "📦 Multi-pack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Mocha Protein Bars",
+      "category": "snack",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 3
+      },
+      "health": 3,
+      "prep": "none",
+      "tags": [
+        "🍿 Snack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Peach Yogurt",
+      "category": "snack",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 4
+      },
+      "health": 4,
+      "prep": "low",
+      "tags": [
+        "🍿 Snack",
+        "🥛 Dairy"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Peanut Butter Pretzels",
+      "category": "snack",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 4
+      },
+      "health": 3,
+      "prep": "none",
+      "tags": [
+        "🍿 Snack",
+        "🥜 Nuts"
+      ],
+      "notes": "Common lunchbox item"
+    },
+    {
+      "name": "Pizza Shapes",
+      "category": "snack",
+      "ratings": {
+        "amelia": 2,
+        "hazel": 2
+      },
+      "health": 2,
+      "prep": "none",
+      "tags": [
+        "🍿 Snack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Pretzel Twists",
+      "category": "snack",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 3
+      },
+      "health": 3,
+      "prep": "none",
+      "tags": [
+        "🍿 Snack"
+      ],
+      "notes": "Common lunchbox item"
+    },
+    {
+      "name": "Seaweed Snacks",
+      "category": "snack",
+      "ratings": {
+        "amelia": 2,
+        "hazel": 3
+      },
+      "health": 4,
+      "prep": "none",
+      "tags": [
+        "🍿 Snack"
+      ],
+      "notes": "Common lunchbox item"
+    },
+    {
+      "name": "Snack Mix",
+      "category": "snack",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 3
+      },
+      "health": 3,
+      "prep": "low",
+      "tags": [
+        "🍿 Snack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Soy Crisps",
+      "category": "snack",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 3
+      },
+      "health": 3,
+      "prep": "low",
+      "tags": [
+        "🍿 Snack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Sweet & Salty Popcorn",
+      "category": "snack",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 5
+      },
+      "health": 4,
+      "prep": "low",
+      "tags": [
+        "🍿 Snack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Sweet Chili Soy Crisps",
+      "category": "snack",
+      "ratings": {
+        "amelia": 1,
+        "hazel": 2
+      },
+      "health": 1,
+      "prep": "low",
+      "tags": [
+        "🍿 Snack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Tasty Cheese",
+      "category": "snack",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 3
+      },
+      "health": 3,
+      "prep": "low",
+      "tags": [
+        "🍿 Snack"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Vanilla Greek Yogurt",
+      "category": "snack",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 4
+      },
+      "health": 4,
+      "prep": "low",
+      "tags": [
+        "🍿 Snack",
+        "🥛 Dairy"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Vegetable Chips",
+      "category": "snack",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 3
+      },
+      "health": 3,
+      "prep": "none",
+      "tags": [
+        "🍿 Snack",
+        "🥕 Vegetables"
+      ],
+      "notes": "Common lunchbox item"
+    },
+    {
+      "name": "Gingernut Biscuits",
+      "category": "treat",
+      "ratings": {
+        "amelia": 2,
+        "hazel": 2
+      },
+      "health": 2,
+      "prep": "none",
+      "tags": [
+        "🍪 Treat"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Baby Carrots",
+      "category": "veggie",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 5
+      },
+      "health": 5,
+      "prep": "medium",
+      "tags": [
+        "🥕 Vegetables",
+        "👶 Baby Veggies"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Broccolini",
+      "category": "veggie",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 5
+      },
+      "health": 5,
+      "prep": "high",
+      "tags": [
+        "🥕 Vegetables"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Cherry Tomatoes",
+      "category": "veggie",
+      "ratings": {
+        "amelia": 4,
+        "hazel": 5
+      },
+      "health": 5,
+      "prep": "medium",
+      "tags": [
+        "🥕 Vegetables"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Green Asparagus",
+      "category": "veggie",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 4
+      },
+      "health": 4,
+      "prep": "high",
+      "tags": [
+        "🥕 Vegetables"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Lebanese Cucumber",
+      "category": "veggie",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 4
+      },
+      "health": 5,
+      "prep": "medium",
+      "tags": [
+        "🥕 Vegetables"
+      ],
+      "notes": "Common lunchbox item"
+    },
+    {
+      "name": "Perino Red Grape Tomatoes",
+      "category": "veggie",
+      "ratings": {
+        "amelia": 5,
+        "hazel": 5
+      },
+      "health": 5,
+      "prep": "medium",
+      "tags": [
+        "🥕 Vegetables"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    },
+    {
+      "name": "Red Capsicum",
+      "category": "veggie",
+      "ratings": {
+        "amelia": 3,
+        "hazel": 4
+      },
+      "health": 4,
+      "prep": "low",
+      "tags": [
+        "🥕 Vegetables"
+      ],
+      "notes": "Extracted from Coles receipts - refined"
+    }
+  ],
+  "summary": {
+    "total_items": 56,
+    "categories": {
+      "fruit": 22,
+      "veggie": 7,
+      "snack": 21,
+      "main": 5,
+      "treat": 1
+    }
+  }
+}

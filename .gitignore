@@ -100,3 +100,6 @@ coverage/
 
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
+
+# Sample grocery data (not for version control)
+sample-items/
